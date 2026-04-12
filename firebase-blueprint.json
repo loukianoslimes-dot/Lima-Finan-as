@@ -1,0 +1,63 @@
+{
+  "entities": {
+    "userSettings": {
+      "title": "Configurações do Usuário",
+      "description": "Armazena o salário base e outras preferências do usuário.",
+      "type": "object",
+      "properties": {
+        "salary": { "type": "number", "description": "Salário base mensal" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["salary"]
+    },
+    "expense": {
+      "title": "Despesa",
+      "description": "Uma despesa individual, fixa ou recorrente.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "ID do usuário proprietário" },
+        "value": { "type": "number" },
+        "description": { "type": "string" },
+        "category": { "type": "string" },
+        "isFixed": { "type": "boolean" },
+        "isRecurring": { "type": "boolean" },
+        "repeatCount": { "type": "number" },
+        "repeatFrequency": { "type": "string", "enum": ["monthly", "yearly"] },
+        "notes": { "type": "string" },
+        "date": { "type": "string", "description": "Formato YYYY-MM-DD" },
+        "parentId": { "type": "string" },
+        "isPaid": { "type": "boolean" },
+        "paidMonths": { "type": "array", "items": { "type": "string" } },
+        "order": { "type": "number", "description": "Ordem de exibição na lista" }
+      },
+      "required": ["uid", "value", "description", "category", "date"]
+    },
+    "additionalSalary": {
+      "title": "Salário Adicional",
+      "description": "Rendas extras recebidas pelo usuário.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "value": { "type": "number" },
+        "description": { "type": "string" },
+        "date": { "type": "string" },
+        "order": { "type": "number", "description": "Ordem de exibição na lista" }
+      },
+      "required": ["uid", "value", "description", "date"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/settings/main": {
+      "schema": "userSettings",
+      "description": "Configurações globais do usuário"
+    },
+    "/users/{userId}/expenses/{expenseId}": {
+      "schema": "expense",
+      "description": "Lista de despesas do usuário"
+    },
+    "/users/{userId}/additionalSalaries/{salaryId}": {
+      "schema": "additionalSalary",
+      "description": "Lista de salários adicionais do usuário"
+    }
+  }
+}

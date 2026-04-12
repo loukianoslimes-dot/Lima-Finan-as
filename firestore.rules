@@ -1,0 +1,122 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: /users/{userId}/settings
+    // Document ID: main
+    // Fields:
+    //   - salary: number (required)
+    //   - updatedAt: string (ISO date)
+    //
+    // Collection: /users/{userId}/expenses
+    // Document ID: auto-generated or UUID
+    // Fields:
+    //   - uid: string (required, must match auth.uid)
+    //   - value: number (required, > 0)
+    //   - description: string (required, 1-100 chars)
+    //   - category: string (required)
+    //   - date: string (required, YYYY-MM-DD)
+    //   - isFixed: bool
+    //   - isRecurring: bool
+    //   - repeatCount: number
+    //   - repeatFrequency: string (monthly|yearly)
+    //   - notes: string (max 500 chars)
+    //   - parentId: string
+    //   - isPaid: bool
+    //   - paidMonths: list (strings YYYY-MM)
+    //   - order: number
+    //
+    // Collection: /users/{userId}/additionalSalaries
+    // Document ID: auto-generated or UUID
+    // Fields:
+    //   - uid: string (required, must match auth.uid)
+    //   - value: number (required, > 0)
+    //   - description: string (required, 1-100 chars)
+    //   - date: string (required, YYYY-MM-DD)
+    //   - order: number
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidString(val, min, max) {
+      return val is string && val.size() >= min && val.size() <= max;
+    }
+
+    function isValidNumber(val, min) {
+      return val is number && val >= min;
+    }
+
+    function isValidDate(val) {
+      return val is string && val.matches("^\\d{4}-\\d{2}-\\d{2}$");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidExpense(data) {
+      return data.keys().hasAll(['uid', 'value', 'description', 'category', 'date']) &&
+             data.uid == request.auth.uid &&
+             isValidNumber(data.value, 0) &&
+             isValidString(data.description, 1, 100) &&
+             isValidDate(data.date) &&
+             (!('order' in data) || data.order is number);
+    }
+
+    function isValidAdditionalSalary(data) {
+      return data.keys().hasAll(['uid', 'value', 'description', 'date']) &&
+             data.uid == request.auth.uid &&
+             isValidNumber(data.value, 0) &&
+             isValidString(data.description, 1, 100) &&
+             isValidDate(data.date) &&
+             (!('order' in data) || data.order is number);
+    }
+
+    function isValidSettings(data) {
+      return data.keys().hasAll(['salary']) &&
+             isValidNumber(data.salary, 0);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      match /settings/main {
+        allow read: if isOwner(userId);
+        allow write: if isOwner(userId) && isValidSettings(request.resource.data);
+      }
+      
+      match /expenses/{expenseId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidExpense(request.resource.data);
+        allow update: if isOwner(userId) && isValidExpense(request.resource.data) && 
+                         request.resource.data.uid == resource.data.uid;
+        allow delete: if isOwner(userId);
+      }
+
+      match /additionalSalaries/{salaryId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidAdditionalSalary(request.resource.data);
+        allow update: if isOwner(userId) && isValidAdditionalSalary(request.resource.data) && 
+                         request.resource.data.uid == resource.data.uid;
+        allow delete: if isOwner(userId);
+      }
+    }
+  }
+}
