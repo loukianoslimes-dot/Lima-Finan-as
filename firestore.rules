@@ -89,7 +89,8 @@ service cloud.firestore {
 
     function isValidSettings(data) {
       return data.keys().hasAll(['salary']) &&
-             isValidNumber(data.salary, 0);
+             isValidNumber(data.salary, 0) &&
+             (!('dashboardOrder' in data) || data.dashboardOrder is list);
     }
 
     // ===============================================================

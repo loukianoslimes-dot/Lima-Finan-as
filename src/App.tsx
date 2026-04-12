@@ -242,6 +242,172 @@ const AdditionalSalaryItem: React.FC<AdditionalSalaryItemProps> = ({
   );
 };
 
+interface DashboardCardProps {
+  widgetId: string;
+  salary: number;
+  handleSalaryChange: (val: number) => void;
+  isSavingSalary: boolean;
+  totalAdditionalSalary: number;
+  totalIncome: number;
+  totalMonthlyExpenses: number;
+  balance: number;
+  formatCurrency: (val: number) => string;
+  year: number;
+  monthName: string;
+  changeMonth: (dir: number) => void;
+  setIsAdditionalSalaryListModalOpen: (open: boolean) => void;
+  setIsAdditionalSalaryModalOpen: (open: boolean) => void;
+  resetAdditionalSalaryForm: () => void;
+}
+
+const DashboardCard: React.FC<DashboardCardProps> = ({
+  widgetId,
+  salary,
+  handleSalaryChange,
+  isSavingSalary,
+  totalAdditionalSalary,
+  totalIncome,
+  totalMonthlyExpenses,
+  balance,
+  formatCurrency,
+  year,
+  monthName,
+  changeMonth,
+  setIsAdditionalSalaryListModalOpen,
+  setIsAdditionalSalaryModalOpen,
+  resetAdditionalSalaryForm
+}) => {
+  const dragControls = useDragControls();
+
+  return (
+    <Reorder.Item 
+      value={widgetId}
+      dragListener={false}
+      dragControls={dragControls}
+      className="touch-none"
+    >
+      <div className="relative h-full group">
+        {/* Drag Handle */}
+        <div 
+          onPointerDown={(e) => dragControls.start(e)}
+          className="absolute top-3 right-3 z-50 cursor-grab active:cursor-grabbing p-2 bg-white/10 rounded-xl hover:bg-white/20 transition-all shadow-lg border border-white/10"
+        >
+          <GripVertical className="w-5 h-5 text-white/60" />
+        </div>
+
+        {widgetId === 'salary-card' && (
+          <div className="bg-white/10 backdrop-blur-md p-6 rounded-3xl border border-white/20 shadow-xl h-full">
+            <div className="flex items-center justify-between mb-4">
+              <Label htmlFor="salary" className="text-white/70 text-xs uppercase font-bold block tracking-widest">Meu Salário</Label>
+              {isSavingSalary && (
+                <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-white/50 text-2xl font-bold shrink-0">R$</span>
+              <Input
+                id="salary"
+                type="number"
+                value={salary || ""}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value) || 0;
+                  handleSalaryChange(val);
+                }}
+                className="bg-transparent border-none text-4xl font-bold text-white focus-visible:ring-0 h-auto p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none w-full"
+                placeholder="0,00"
+              />
+            </div>
+          </div>
+        )}
+
+        {widgetId === 'additional-salary-card' && (
+          <div 
+            className="bg-white/10 backdrop-blur-md p-6 rounded-3xl border border-white/20 shadow-xl flex flex-col cursor-pointer hover:bg-white/15 transition-all h-full"
+            onClick={() => setIsAdditionalSalaryListModalOpen(true)}
+          >
+            <div className="flex justify-between items-start mb-4">
+              <Label className="text-white/70 text-xs uppercase font-bold block tracking-widest cursor-pointer">Salário Adicional</Label>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={(e) => { e.stopPropagation(); resetAdditionalSalaryForm(); setIsAdditionalSalaryModalOpen(true); }}
+                className="h-8 w-8 rounded-full bg-white/10 text-white hover:bg-white/20"
+              >
+                <Plus className="w-4 h-4" />
+              </Button>
+            </div>
+            <div className="flex items-baseline gap-3">
+              <span className="text-white/50 text-2xl font-bold">R$</span>
+              <span className="text-4xl font-bold text-white">{totalAdditionalSalary.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+            </div>
+            <div className="mt-4 text-xs text-white/40 flex items-center gap-2">
+              <ChevronRight className="w-3 h-3" />
+              Clique para ver detalhes
+            </div>
+          </div>
+        )}
+
+        {widgetId === 'income-summary' && (
+          <Card className="bg-white/10 backdrop-blur-md border-white/20 text-white overflow-hidden relative p-6 rounded-3xl h-full shadow-xl">
+            <div className="absolute top-0 right-0 p-4 opacity-10">
+              <ArrowUpCircle className="w-12 h-12" />
+            </div>
+            <div className="text-xs font-bold text-white/70 uppercase mb-2 tracking-widest">Rendimentos</div>
+            <div className="text-3xl font-bold">{formatCurrency(totalIncome)}</div>
+          </Card>
+        )}
+
+        {widgetId === 'expenses-summary' && (
+          <Card className="bg-white/10 backdrop-blur-md border-white/20 text-white overflow-hidden relative p-6 rounded-3xl h-full shadow-xl">
+            <div className="absolute top-0 right-0 p-4 opacity-10">
+              <ArrowDownCircle className="w-12 h-12" />
+            </div>
+            <div className="text-xs font-bold text-white/70 uppercase mb-2 tracking-widest">Despesas</div>
+            <div className="text-3xl font-bold text-red-300">{formatCurrency(totalMonthlyExpenses)}</div>
+          </Card>
+        )}
+
+        {widgetId === 'balance-summary' && (
+          <Card className="bg-white/10 backdrop-blur-md border-white/20 text-white overflow-hidden relative p-6 rounded-3xl h-full shadow-xl">
+            <div className="absolute top-0 right-0 p-4 opacity-10">
+              <Wallet className="w-12 h-12" />
+            </div>
+            <div className="text-xs font-bold text-white/70 uppercase mb-2 tracking-widest">Saldo</div>
+            <div className={cn("text-3xl font-bold", balance >= 0 ? "text-green-300" : "text-red-400")}>
+              {formatCurrency(balance)}
+            </div>
+          </Card>
+        )}
+
+        {widgetId === 'month-selector' && (
+          <div className="flex items-center justify-center gap-6 bg-white/10 backdrop-blur-md p-6 rounded-3xl border border-white/20 h-full shadow-xl">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => changeMonth(-1)} 
+              className="text-white hover:bg-white/10 h-12 w-12 rounded-2xl"
+            >
+              <ChevronLeft className="w-6 h-6" />
+            </Button>
+            <div className="text-center min-w-[140px]">
+              <div className="text-xs uppercase font-bold text-white/50 tracking-widest mb-1">{year}</div>
+              <div className="text-2xl font-bold capitalize">{monthName}</div>
+            </div>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => changeMonth(1)} 
+              className="text-white hover:bg-white/10 h-12 w-12 rounded-2xl"
+            >
+              <ChevronRight className="w-6 h-6" />
+            </Button>
+          </div>
+        )}
+      </div>
+    </Reorder.Item>
+  );
+};
+
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
@@ -250,6 +416,14 @@ export default function App() {
   const [validationError, setValidationError] = useState<string | null>(null);
 
   const [isSavingSalary, setIsSavingSalary] = useState(false);
+  const [dashboardOrder, setDashboardOrder] = useState<string[]>([
+    'salary-card', 
+    'additional-salary-card', 
+    'income-summary', 
+    'expenses-summary', 
+    'balance-summary', 
+    'month-selector'
+  ]);
   const [salaryTimeout, setSalaryTimeout] = useState<NodeJS.Timeout | null>(null);
 
   const [salary, setSalary] = useState<number>(0);
@@ -313,19 +487,22 @@ export default function App() {
     };
     testConnection();
 
-    // Listen to Settings (Salary)
+    // Listen to Settings (Salary & Dashboard Order)
     const settingsPath = `users/${user.uid}/settings/main`;
     const settingsUnsubscribe = onSnapshot(doc(db, settingsPath), (docSnap) => {
       if (docSnap.exists()) {
-        const cloudSalary = docSnap.data().salary || 0;
+        const data = docSnap.data();
+        const cloudSalary = data.salary || 0;
         setSalary(prev => {
-          // Only update local state if it's different from cloud
-          // and we're not currently in the middle of a debounced save
           if (prev !== cloudSalary && !isSavingSalary) {
             return cloudSalary;
           }
           return prev;
         });
+
+        if (data.dashboardOrder && Array.isArray(data.dashboardOrder)) {
+          setDashboardOrder(data.dashboardOrder);
+        }
       }
       setIsSyncing(docSnap.metadata.hasPendingWrites || docSnap.metadata.fromCache);
     }, (error) => handleFirestoreError(error, OperationType.GET, settingsPath));
@@ -360,6 +537,18 @@ export default function App() {
       additionalUnsubscribe();
     };
   }, [user]);
+
+  const handleReorderDashboard = async (newOrder: string[]) => {
+    setDashboardOrder(newOrder);
+    if (!user) return;
+    
+    const path = `users/${user.uid}/settings/main`;
+    try {
+      await updateDoc(doc(db, path), { dashboardOrder: newOrder });
+    } catch (error) {
+      console.error("Error updating dashboard order:", error);
+    }
+  };
 
   const handleReorderExpenses = async (newOrder: Expense[]) => {
     setDisplayExpenses(newOrder);
@@ -1015,7 +1204,7 @@ export default function App() {
               <div className="bg-white/20 p-6 rounded-3xl backdrop-blur-md inline-block mx-auto">
                 <Wallet className="w-16 h-16 text-white" />
               </div>
-              <h1 className="text-4xl font-bold tracking-tight">Finanzo</h1>
+              <h1 className="text-4xl font-bold tracking-tight">Lima Finanças</h1>
               <p className="text-white/70 max-w-xs mx-auto">
                 Seu controle financeiro inteligente, sincronizado em todos os seus dispositivos.
               </p>
@@ -1048,7 +1237,7 @@ export default function App() {
                 </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <h1 className="text-2xl font-bold tracking-tight">Finanzo</h1>
+                      <h1 className="text-2xl font-bold tracking-tight">Lima Finanças</h1>
                       {user && (
                         <div className={cn(
                           "w-2 h-2 rounded-full",
@@ -1097,116 +1286,33 @@ export default function App() {
 
             {activeTab === "home" ? (
               <>
-                {/* Salary Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <motion.div 
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/20 shadow-xl"
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <Label htmlFor="salary" className="text-white/70 text-[10px] uppercase font-bold block tracking-wider">Meu Salário</Label>
-                      {isSavingSalary && (
-                        <div className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-white/50 text-xl font-bold shrink-0">R$</span>
-                      <Input
-                        id="salary"
-                        type="number"
-                        value={salary || ""}
-                        onChange={(e) => {
-                          const val = parseFloat(e.target.value) || 0;
-                          handleSalaryChange(val);
-                        }}
-                        className="bg-transparent border-none text-3xl font-bold text-white focus-visible:ring-0 h-auto p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none w-full"
-                        placeholder="0,00"
-                      />
-                    </div>
-                  </motion.div>
-
-              <motion.div 
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/20 shadow-xl flex flex-col cursor-pointer hover:bg-white/15 transition-colors"
-                onClick={() => setIsAdditionalSalaryListModalOpen(true)}
-              >
-                <div className="flex justify-between items-start mb-2">
-                  <Label className="text-white/70 text-[10px] uppercase font-bold block tracking-wider cursor-pointer">Salário Adicional</Label>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    onClick={(e) => { e.stopPropagation(); resetAdditionalSalaryForm(); setIsAdditionalSalaryModalOpen(true); }}
-                    className="h-6 w-6 rounded-full bg-white/10 text-white hover:bg-white/20"
-                  >
-                    <Plus className="w-3 h-3" />
-                  </Button>
-                </div>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-white/50 text-lg font-bold">R$</span>
-                  <span className="text-3xl font-bold text-white">{totalAdditionalSalary.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                </div>
-                <div className="mt-2 text-[8px] text-white/40 flex items-center gap-1">
-                  <ChevronRight className="w-2 h-2" />
-                  Clique para ver detalhes
-                </div>
-              </motion.div>
-            </div>
-
-            {/* Summary Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.1 }}>
-                <Card className="bg-white/10 backdrop-blur-md border-white/20 text-white overflow-hidden relative p-4">
-                  <div className="absolute top-0 right-0 p-2 opacity-10">
-                    <ArrowUpCircle className="w-10 h-10" />
-                  </div>
-                  <div className="text-[10px] font-bold text-white/70 uppercase mb-1 tracking-wider">Rendimentos</div>
-                  <div className="text-xl font-bold">{formatCurrency(totalIncome)}</div>
-                </Card>
-              </motion.div>
-
-              <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.2 }}>
-                <Card className="bg-white/10 backdrop-blur-md border-white/20 text-white overflow-hidden relative p-4">
-                  <div className="absolute top-0 right-0 p-2 opacity-10">
-                    <ArrowDownCircle className="w-10 h-10" />
-                  </div>
-                  <div className="text-[10px] font-bold text-white/70 uppercase mb-1 tracking-wider">Despesas</div>
-                  <div className="text-xl font-bold text-red-300">{formatCurrency(totalMonthlyExpenses)}</div>
-                </Card>
-              </motion.div>
-
-              <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3 }}>
-                <Card className="bg-white/10 backdrop-blur-md border-white/20 text-white overflow-hidden relative p-4">
-                  <div className="absolute top-0 right-0 p-2 opacity-10">
-                    <Wallet className="w-10 h-10" />
-                  </div>
-                  <div className="text-[10px] font-bold text-white/70 uppercase mb-1 tracking-wider">Saldo</div>
-                  <div className={cn("text-xl font-bold", balance >= 0 ? "text-green-300" : "text-red-400")}>
-                    {formatCurrency(balance)}
-                  </div>
-                </Card>
-              </motion.div>
-            </div>
-
-            {/* Month Selector */}
-            <motion.div 
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.35 }}
-              className="flex items-center justify-center gap-4 bg-white/10 backdrop-blur-md p-3 rounded-2xl border border-white/20"
-            >
-              <Button variant="ghost" size="icon" onClick={() => changeMonth(-1)} className="text-white hover:bg-white/10">
-                <ChevronLeft className="w-5 h-5" />
-              </Button>
-              <div className="text-center min-w-[160px]">
-                <div className="text-xs uppercase font-bold text-white/50 tracking-widest">{year}</div>
-                <div className="text-xl font-bold capitalize">{monthName}</div>
-              </div>
-              <Button variant="ghost" size="icon" onClick={() => changeMonth(1)} className="text-white hover:bg-white/10">
-                <ChevronRight className="w-5 h-5" />
-              </Button>
-            </motion.div>
+                <Reorder.Group 
+                  axis="y" 
+                  values={dashboardOrder} 
+                  onReorder={handleReorderDashboard}
+                  className="space-y-4"
+                >
+                  {dashboardOrder.map((widgetId) => (
+                    <DashboardCard
+                      key={widgetId}
+                      widgetId={widgetId}
+                      salary={salary}
+                      handleSalaryChange={handleSalaryChange}
+                      isSavingSalary={isSavingSalary}
+                      totalAdditionalSalary={totalAdditionalSalary}
+                      totalIncome={totalIncome}
+                      totalMonthlyExpenses={totalMonthlyExpenses}
+                      balance={balance}
+                      formatCurrency={formatCurrency}
+                      year={year}
+                      monthName={monthName}
+                      changeMonth={changeMonth}
+                      setIsAdditionalSalaryListModalOpen={setIsAdditionalSalaryListModalOpen}
+                      setIsAdditionalSalaryModalOpen={setIsAdditionalSalaryModalOpen}
+                      resetAdditionalSalaryForm={resetAdditionalSalaryForm}
+                    />
+                  ))}
+                </Reorder.Group>
 
             {/* Expenses List */}
             <motion.div 

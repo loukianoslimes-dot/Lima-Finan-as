@@ -6,6 +6,7 @@
       "type": "object",
       "properties": {
         "salary": { "type": "number", "description": "Salário base mensal" },
+        "dashboardOrder": { "type": "array", "items": { "type": "string" }, "description": "Ordem dos cards no dashboard" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["salary"]
