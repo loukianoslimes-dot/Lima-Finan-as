@@ -70,3 +70,15 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   console.error('Firestore Error: ', JSON.stringify(errInfo));
   throw new Error(JSON.stringify(errInfo));
 }
+
+export function sanitizeData(data: any): any {
+  const sanitized = { ...data };
+  Object.keys(sanitized).forEach(key => {
+    if (sanitized[key] === undefined) {
+      delete sanitized[key];
+    } else if (sanitized[key] !== null && typeof sanitized[key] === 'object' && !Array.isArray(sanitized[key])) {
+      sanitized[key] = sanitizeData(sanitized[key]);
+    }
+  });
+  return sanitized;
+}

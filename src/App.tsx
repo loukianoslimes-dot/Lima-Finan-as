@@ -30,7 +30,7 @@ import {
   getDoc,
   getDocFromServer
 } from "firebase/firestore";
-import { auth, db, signInWithGoogle, logout, handleFirestoreError, OperationType } from "./firebase";
+import { auth, db, signInWithGoogle, logout, handleFirestoreError, OperationType, sanitizeData } from "./firebase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -247,6 +247,7 @@ export default function App() {
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [isSyncing, setIsSyncing] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   const [isSavingSalary, setIsSavingSalary] = useState(false);
   const [salaryTimeout, setSalaryTimeout] = useState<NodeJS.Timeout | null>(null);
@@ -444,7 +445,20 @@ export default function App() {
 
   const handleAddExpense = async () => {
     if (!user) return;
+    
+    // Basic validation
+    if (!formData.description.trim()) {
+      setValidationError("A descrição é obrigatória.");
+      return;
+    }
+    if (formData.value <= 0) {
+      setValidationError("O valor deve ser maior que zero.");
+      return;
+    }
+
+    setValidationError(null);
     setIsSaving(true);
+    console.log("Starting to save expense:", formData);
     
     const expenseData = {
       ...formData,
@@ -457,26 +471,28 @@ export default function App() {
 
     try {
       if (editingExpense) {
+        console.log("Editing existing expense:", editingExpense.id);
         if (editingExpense.isFixed || editingExpense.parentId || editingExpense.isRecurring) {
           setRecurringActionType("edit");
           setIsRecurringActionModalOpen(true);
           setIsSaving(false);
+          return; // Stop here, the recurring modal will handle the rest
         } else {
           const path = `${basePath}/${editingExpense.id}`;
-          await setDoc(doc(db, path), {
+          await setDoc(doc(db, path), sanitizeData({
             ...expenseData,
             order: editingExpense.order ?? nextOrder
-          });
-          setIsAddModalOpen(false);
-          resetForm();
-          setIsSaving(false);
+          }));
         }
       } else {
+        console.log("Adding new expense");
         if (formData.isRecurring && formData.repeatCount > 1) {
+          console.log("Creating recurring expenses:", formData.repeatCount);
           const parentId = crypto.randomUUID();
           const [y, m, d] = formData.date.split('-').map(Number);
           const baseDate = new Date(y, m - 1, d);
 
+          const batch = writeBatch(db);
           for (let i = 0; i < formData.repeatCount; i++) {
             const nextDate = new Date(baseDate);
             if (formData.repeatFrequency === "monthly") {
@@ -491,28 +507,31 @@ export default function App() {
 
             const id = crypto.randomUUID();
             const path = `${basePath}/${id}`;
-            await setDoc(doc(db, path), {
+            batch.set(doc(db, path), sanitizeData({
               ...expenseData,
               date: `${ny}-${nm}-${nd}`,
-              parentId: i === 0 ? undefined : parentId,
+              parentId: i === 0 ? null : parentId,
               order: nextOrder,
-            });
+            }));
           }
+          await batch.commit();
         } else {
           const id = crypto.randomUUID();
           const path = `${basePath}/${id}`;
-          await setDoc(doc(db, path), {
+          await setDoc(doc(db, path), sanitizeData({
             ...expenseData,
             order: nextOrder
-          });
+          }));
         }
-        setIsAddModalOpen(false);
-        resetForm();
-        setIsSaving(false);
       }
+      console.log("Expense saved successfully");
+      setIsAddModalOpen(false);
+      resetForm();
     } catch (error) {
-      setIsSaving(false);
+      console.error("Error saving expense:", error);
       handleFirestoreError(error, OperationType.WRITE, basePath);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -532,6 +551,7 @@ export default function App() {
   const handleRecurringAction = async (scope: "only-this" | "all-pending" | "all") => {
     if (!editingExpense || !recurringActionType || !user) return;
 
+    setIsSaving(true);
     const currentMonthStr = currentDate.toISOString().slice(0, 7);
     const targetGroupId = editingExpense.parentId || editingExpense.id;
     const basePath = `users/${user.uid}/expenses`;
@@ -546,15 +566,19 @@ export default function App() {
           return true;
         });
 
+        const batch = writeBatch(db);
         for (const e of toUpdate) {
           const path = `${basePath}/${e.id}`;
-          await setDoc(doc(db, path), {
+          const updatedData = sanitizeData({
             ...e,
             ...formData,
             uid: user.uid,
-            date: e.date // Keep original date
+            date: e.date, // Keep original date
+            parentId: e.parentId || null
           });
+          batch.set(doc(db, path), updatedData);
         }
+        await batch.commit();
       } else if (recurringActionType === "delete") {
         const toDelete = expenses.filter(e => {
           const isSameGroup = e.id === targetGroupId || e.parentId === targetGroupId || (editingExpense.isFixed && e.id === editingExpense.id);
@@ -564,19 +588,22 @@ export default function App() {
           return true;
         });
 
+        const batch = writeBatch(db);
         for (const e of toDelete) {
           const path = `${basePath}/${e.id}`;
-          await deleteDoc(doc(db, path));
+          batch.delete(doc(db, path));
         }
+        await batch.commit();
       }
+      setIsRecurringActionModalOpen(false);
+      setIsAddModalOpen(false);
+      setRecurringActionType(null);
+      resetForm();
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, basePath);
+    } finally {
+      setIsSaving(false);
     }
-
-    setIsRecurringActionModalOpen(false);
-    setIsAddModalOpen(false);
-    setRecurringActionType(null);
-    resetForm();
   };
 
   const handleTogglePaid = async (expense: Expense) => {
@@ -606,6 +633,18 @@ export default function App() {
 
   const handleAddAdditionalSalary = async () => {
     if (!user) return;
+    
+    // Basic validation
+    if (!additionalSalaryFormData.description.trim()) {
+      setValidationError("A descrição é obrigatória.");
+      return;
+    }
+    if (additionalSalaryFormData.value <= 0) {
+      setValidationError("O valor deve ser maior que zero.");
+      return;
+    }
+
+    setValidationError(null);
     setIsSaving(true);
     const salaryData = {
       ...additionalSalaryFormData,
@@ -619,24 +658,24 @@ export default function App() {
     try {
       if (editingAdditionalSalary) {
         const path = `${basePath}/${editingAdditionalSalary.id}`;
-        await setDoc(doc(db, path), {
+        await setDoc(doc(db, path), sanitizeData({
           ...salaryData,
           order: editingAdditionalSalary.order ?? nextOrder
-        });
+        }));
       } else {
         const id = crypto.randomUUID();
         const path = `${basePath}/${id}`;
-        await setDoc(doc(db, path), {
+        await setDoc(doc(db, path), sanitizeData({
           ...salaryData,
           order: nextOrder
-        });
+        }));
       }
       setIsAdditionalSalaryModalOpen(false);
       resetAdditionalSalaryForm();
-      setIsSaving(false);
     } catch (error) {
-      setIsSaving(false);
       handleFirestoreError(error, OperationType.WRITE, basePath);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -853,6 +892,7 @@ export default function App() {
       date: today,
     });
     setEditingAdditionalSalary(null);
+    setValidationError(null);
   };
 
   const handleAddCategory = () => {
@@ -878,6 +918,7 @@ export default function App() {
       date: today,
     });
     setEditingExpense(null);
+    setValidationError(null);
   };
 
   const formatCurrency = (value: number) => {
@@ -1539,6 +1580,14 @@ export default function App() {
               />
             </div>
           </div>
+          {validationError && (
+            <div className="px-6 pb-2">
+              <div className="bg-red-500/20 border border-red-500/50 p-3 rounded-xl flex items-center gap-2 text-red-200 text-sm">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                {validationError}
+              </div>
+            </div>
+          )}
           <DialogFooter>
             <Button 
               onClick={handleAddExpense}
@@ -1595,6 +1644,14 @@ export default function App() {
               />
             </div>
           </div>
+          {validationError && (
+            <div className="px-6 pb-2">
+              <div className="bg-red-500/20 border border-red-500/50 p-3 rounded-xl flex items-center gap-2 text-red-200 text-sm">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                {validationError}
+              </div>
+            </div>
+          )}
           <DialogFooter className="flex flex-col gap-2 sm:flex-row">
             {editingAdditionalSalary && (
               <Button 
@@ -1636,6 +1693,7 @@ export default function App() {
                 variant="outline" 
                 className="justify-start border-white/20 hover:bg-white/20 text-white bg-white/5"
                 onClick={() => handleRecurringAction("only-this")}
+                disabled={isSaving}
               >
                 {recurringActionType === "edit" ? "Alterar somente esta" : "Excluir somente esta"}
               </Button>
@@ -1643,6 +1701,7 @@ export default function App() {
                 variant="outline" 
                 className="justify-start border-white/20 hover:bg-white/20 text-white bg-white/5"
                 onClick={() => handleRecurringAction("all-pending")}
+                disabled={isSaving}
               >
                 {recurringActionType === "edit" ? "Alterar todas pendentes" : "Excluir todas pendentes"}
               </Button>
@@ -1650,6 +1709,7 @@ export default function App() {
                 variant="outline" 
                 className="justify-start border-white/20 hover:bg-white/20 text-white bg-white/5"
                 onClick={() => handleRecurringAction("all")}
+                disabled={isSaving}
               >
                 {recurringActionType === "edit" ? "Alterar todas (incluindo efetivadas)" : "Excluir todas (incluindo efetivadas)"}
               </Button>
