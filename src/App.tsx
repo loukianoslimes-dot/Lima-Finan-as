@@ -1150,20 +1150,20 @@ export default function App() {
             {activeTab === "home" ? (
               <>
                 {/* Salary Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-2 gap-3">
                   <motion.div 
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
-                    className="bg-white/10 backdrop-blur-md p-6 rounded-3xl border border-white/20 shadow-xl"
+                    className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/20 shadow-xl"
                   >
-                    <div className="flex items-center justify-between mb-4">
-                      <Label htmlFor="salary" className="text-white/70 text-xs uppercase font-bold block tracking-widest">Meu Salário</Label>
+                    <div className="flex items-center justify-between mb-2">
+                      <Label htmlFor="salary" className="text-white/70 text-[10px] uppercase font-bold block tracking-widest">Meu Salário</Label>
                       {isSavingSalary && (
-                        <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                        <div className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin" />
                       )}
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-white/50 text-2xl font-bold shrink-0">R$</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-white/50 text-lg font-bold shrink-0">R$</span>
                       <Input
                         id="salary"
                         type="number"
@@ -1172,7 +1172,7 @@ export default function App() {
                           const val = parseFloat(e.target.value) || 0;
                           handleSalaryChange(val);
                         }}
-                        className="bg-transparent border-none text-4xl font-bold text-white focus-visible:ring-0 h-auto p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none w-full"
+                        className="bg-transparent border-none text-2xl font-bold text-white focus-visible:ring-0 h-auto p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none w-full"
                         placeholder="0,00"
                       />
                     </div>
@@ -1181,60 +1181,61 @@ export default function App() {
                   <motion.div 
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
-                    className="bg-white/10 backdrop-blur-md p-6 rounded-3xl border border-white/20 shadow-xl flex flex-col cursor-pointer hover:bg-white/15 transition-all"
+                    className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/20 shadow-xl flex flex-col cursor-pointer hover:bg-white/15 transition-all"
                     onClick={() => setIsAdditionalSalaryListModalOpen(true)}
                   >
-                    <div className="flex justify-between items-start mb-4">
-                      <Label className="text-white/70 text-xs uppercase font-bold block tracking-widest cursor-pointer">Salário Adicional</Label>
+                    <div className="flex justify-between items-start mb-2">
+                      <Label className="text-white/70 text-[10px] uppercase font-bold block tracking-widest cursor-pointer">Extras</Label>
                       <Button 
                         variant="ghost" 
                         size="icon" 
                         onClick={(e) => { e.stopPropagation(); resetAdditionalSalaryForm(); setIsAdditionalSalaryModalOpen(true); }}
-                        className="h-8 w-8 rounded-full bg-white/10 text-white hover:bg-white/20"
+                        className="h-6 w-6 rounded-full bg-white/10 text-white hover:bg-white/20"
                       >
-                        <Plus className="w-4 h-4" />
+                        <Plus className="w-3 h-3" />
                       </Button>
                     </div>
-                    <div className="flex items-baseline gap-3">
-                      <span className="text-white/50 text-2xl font-bold">R$</span>
-                      <span className="text-4xl font-bold text-white">{totalAdditionalSalary.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                    </div>
-                    <div className="mt-4 text-xs text-white/40 flex items-center gap-2">
-                      <ChevronRight className="w-3 h-3" />
-                      Clique para ver detalhes
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-white/50 text-lg font-bold">R$</span>
+                      <span className="text-2xl font-bold text-white">{totalAdditionalSalary.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                     </div>
                   </motion.div>
                 </div>
 
                 {/* Summary Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.1 }}>
-                    <Card className="bg-white/10 backdrop-blur-md border-white/20 text-white overflow-hidden relative p-6 rounded-3xl h-full shadow-xl">
-                      <div className="absolute top-0 right-0 p-4 opacity-10">
-                        <ArrowUpCircle className="w-12 h-12" />
+                    <Card className="bg-white/10 backdrop-blur-md border-white/20 text-white overflow-hidden relative p-4 rounded-2xl h-full shadow-xl">
+                      <div className="absolute top-0 right-0 p-2 opacity-10">
+                        <ArrowUpCircle className="w-8 h-8" />
                       </div>
-                      <div className="text-xs font-bold text-white/70 uppercase mb-2 tracking-widest">Rendimentos</div>
-                      <div className="text-3xl font-bold">{formatCurrency(totalIncome)}</div>
+                      <div className="text-[10px] font-bold text-white/70 uppercase mb-1 tracking-widest">Rendimentos</div>
+                      <div className="text-xl font-bold">{formatCurrency(totalIncome)}</div>
                     </Card>
                   </motion.div>
 
                   <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.2 }}>
-                    <Card className="bg-white/10 backdrop-blur-md border-white/20 text-white overflow-hidden relative p-6 rounded-3xl h-full shadow-xl">
-                      <div className="absolute top-0 right-0 p-4 opacity-10">
-                        <ArrowDownCircle className="w-12 h-12" />
+                    <Card className="bg-white/10 backdrop-blur-md border-white/20 text-white overflow-hidden relative p-4 rounded-2xl h-full shadow-xl">
+                      <div className="absolute top-0 right-0 p-2 opacity-10">
+                        <ArrowDownCircle className="w-8 h-8" />
                       </div>
-                      <div className="text-xs font-bold text-white/70 uppercase mb-2 tracking-widest">Despesas</div>
-                      <div className="text-3xl font-bold text-red-300">{formatCurrency(totalMonthlyExpenses)}</div>
+                      <div className="text-[10px] font-bold text-white/70 uppercase mb-1 tracking-widest">Despesas</div>
+                      <div className="text-xl font-bold text-red-300">{formatCurrency(totalMonthlyExpenses)}</div>
                     </Card>
                   </motion.div>
 
-                  <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3 }}>
-                    <Card className="bg-white/10 backdrop-blur-md border-white/20 text-white overflow-hidden relative p-6 rounded-3xl h-full shadow-xl">
-                      <div className="absolute top-0 right-0 p-4 opacity-10">
-                        <Wallet className="w-12 h-12" />
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.9 }} 
+                    animate={{ opacity: 1, scale: 1 }} 
+                    transition={{ delay: 0.3 }}
+                    className="col-span-2 sm:col-span-1"
+                  >
+                    <Card className="bg-white/10 backdrop-blur-md border-white/20 text-white overflow-hidden relative p-4 rounded-2xl h-full shadow-xl">
+                      <div className="absolute top-0 right-0 p-2 opacity-10">
+                        <Wallet className="w-8 h-8" />
                       </div>
-                      <div className="text-xs font-bold text-white/70 uppercase mb-2 tracking-widest">Saldo</div>
-                      <div className={cn("text-3xl font-bold", balance >= 0 ? "text-green-300" : "text-red-400")}>
+                      <div className="text-[10px] font-bold text-white/70 uppercase mb-1 tracking-widest">Saldo</div>
+                      <div className={cn("text-xl font-bold", balance >= 0 ? "text-green-300" : "text-red-400")}>
                         {formatCurrency(balance)}
                       </div>
                     </Card>
