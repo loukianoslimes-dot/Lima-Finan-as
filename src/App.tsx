@@ -1082,6 +1082,24 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#144a95] to-[#628cc0] text-white p-4 md:p-8 font-sans">
+      {/* Zoom Controls */}
+      <div className="fixed bottom-24 right-6 flex flex-col gap-2 z-50">
+        <Button
+          size="icon"
+          className="h-10 w-10 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 text-white shadow-2xl hover:bg-white/20"
+          onClick={() => setZoomLevel(prev => Math.min(prev + 0.1, 1.5))}
+        >
+          <Plus className="w-5 h-5" />
+        </Button>
+        <Button
+          size="icon"
+          className="h-10 w-10 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 text-white shadow-2xl hover:bg-white/20"
+          onClick={() => setZoomLevel(prev => Math.max(prev - 0.1, 0.7))}
+        >
+          <div className="w-4 h-0.5 bg-current" />
+        </Button>
+      </div>
+
       <div 
         className="max-w-3xl mx-auto w-full space-y-6 pb-24"
         style={{ zoom: zoomLevel } as React.CSSProperties}
@@ -1593,24 +1611,6 @@ export default function App() {
         {/* Navigation Bar (Mobile Friendly) */}
         {user && (
           <>
-            {/* Zoom Controls */}
-            <div className="fixed bottom-24 right-6 flex flex-col gap-2 z-50">
-              <Button
-                size="icon"
-                className="h-10 w-10 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 text-white shadow-2xl hover:bg-white/20"
-                onClick={() => setZoomLevel(prev => Math.min(prev + 0.1, 1.5))}
-              >
-                <Plus className="w-5 h-5" />
-              </Button>
-              <Button
-                size="icon"
-                className="h-10 w-10 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 text-white shadow-2xl hover:bg-white/20"
-                onClick={() => setZoomLevel(prev => Math.max(prev - 0.1, 0.7))}
-              >
-                <div className="w-4 h-0.5 bg-current" />
-              </Button>
-            </div>
-
             <div className="fixed bottom-0 left-0 right-0 p-4 flex justify-center z-40">
             <div className="bg-[#144a95]/80 backdrop-blur-xl border border-white/20 rounded-full p-2 flex items-center gap-2 shadow-2xl">
               <Button 
