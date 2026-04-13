@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Plus, Trash2, Edit2, Wallet, ArrowUpCircle, ArrowDownCircle, ChevronLeft, ChevronRight, Calendar as CalendarIcon, BarChart3, Home, PieChart, TrendingUp, LogOut, LogIn, AlertCircle, GripVertical, Share2, Copy, Check, Download } from "lucide-react";
+import { Plus, Trash2, Edit2, Wallet, ArrowUpCircle, ArrowDownCircle, ChevronLeft, ChevronRight, Calendar as CalendarIcon, BarChart3, Home, PieChart, TrendingUp, LogOut, LogIn, AlertCircle, GripVertical, Share2, Copy, Check, Download, Camera, User as UserIcon } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   BarChart, 
@@ -244,31 +244,41 @@ const AdditionalSalaryItem: React.FC<AdditionalSalaryItemProps> = ({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
       layout
-      className="group bg-white/5 hover:bg-white/10 p-3 rounded-2xl transition-all border border-white/5 flex items-center justify-between gap-4"
+      className="group bg-white/5 hover:bg-white/10 p-3 rounded-2xl transition-all border border-white/5 flex items-center gap-4"
     >
-      <div className="flex items-center gap-3 flex-1 min-w-0">
-        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onEdit(salary)}>
-          <div className="flex justify-between items-center mb-1">
-            <span className="font-bold text-white truncate mr-2">{salary.description}</span>
-            <div className="font-bold text-green-300 shrink-0 flex items-baseline gap-1">
-              <span className="text-[10px] opacity-50">{symbol}</span>
-              <span className="whitespace-nowrap">{amount}</span>
-            </div>
-          </div>
-          <div className="text-xs text-white/40">
-            {formatDate(salary.date)}
-          </div>
+      <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onEdit(salary)}>
+        <div className="text-[10px] font-bold text-white/40 uppercase tracking-wider mb-0.5">Rendimento Extra</div>
+        <div className="font-bold text-white truncate">{salary.description}</div>
+        <div className="text-[10px] text-white/30 mt-0.5">
+          {formatDate(salary.date)}
         </div>
       </div>
-      <div>
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className="h-8 w-8 text-red-400 hover:text-red-300 hover:bg-red-500/10"
-          onClick={() => onDelete(salary.id)}
-        >
-          <Trash2 className="w-4 h-4" />
-        </Button>
+
+      <div className="flex items-center gap-3 ml-auto">
+        <div className="text-right shrink-0">
+          <div className="font-bold text-green-300 flex items-baseline gap-1">
+            <span className="text-[10px] opacity-50">{symbol}</span>
+            <span className="text-lg whitespace-nowrap">{amount}</span>
+          </div>
+        </div>
+        <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-7 w-7 text-white/70 hover:text-white hover:bg-white/10"
+            onClick={(e) => { e.stopPropagation(); onEdit(salary); }}
+          >
+            <Edit2 className="w-3.5 h-3.5" />
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-7 w-7 text-red-400 hover:text-red-300 hover:bg-red-500/10"
+            onClick={(e) => { e.stopPropagation(); onDelete(salary.id); }}
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </Button>
+        </div>
       </div>
     </motion.div>
   );
@@ -318,6 +328,54 @@ export default function App() {
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [editingAdditionalSalary, setEditingAdditionalSalary] = useState<AdditionalSalary | null>(null);
   const [newCategory, setNewCategory] = useState("");
+
+  const [systemConfig, setSystemConfig] = useState<{ appIconUrl?: string }>({});
+  const isAdmin = user?.email === "loukianoslimes@gmail.com";
+
+  // Fetch System Config
+  useEffect(() => {
+    const configPath = "system/config";
+    const unsubscribe = onSnapshot(doc(db, configPath), (docSnap) => {
+      if (docSnap.exists()) {
+        setSystemConfig(docSnap.data() as { appIconUrl?: string });
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Update PWA icons dynamically
+  useEffect(() => {
+    if (systemConfig.appIconUrl) {
+      const updateLink = (rel: string, href: string) => {
+        let link = document.querySelector(`link[rel="${rel}"]`) as HTMLLinkElement;
+        if (!link) {
+          link = document.createElement('link');
+          link.rel = rel;
+          document.head.appendChild(link);
+        }
+        link.href = href;
+      };
+
+      updateLink('icon', systemConfig.appIconUrl);
+      updateLink('apple-touch-icon', systemConfig.appIconUrl);
+    }
+  }, [systemConfig.appIconUrl]);
+
+  const handleIconUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !isAdmin) return;
+
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      const base64String = reader.result as string;
+      try {
+        await setDoc(doc(db, "system/config"), { appIconUrl: base64String }, { merge: true });
+      } catch (error) {
+        console.error("Error uploading icon:", error);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Firebase Auth Listener
   useEffect(() => {
@@ -507,7 +565,7 @@ export default function App() {
   };
 
   const copyToClipboard = () => {
-    navigator.clipboard.writeText("https://limafinancas.netlify.app");
+    navigator.clipboard.writeText(window.location.origin);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -989,7 +1047,14 @@ export default function App() {
     setValidationError(null);
   };
 
-  const [zoomLevel, setZoomLevel] = useState(1);
+  const [zoomLevel, setZoomLevel] = useState(() => {
+    const saved = localStorage.getItem('app-zoom-level');
+    return saved ? parseFloat(saved) : 1;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('app-zoom-level', zoomLevel.toString());
+  }, [zoomLevel]);
 
   const formatCurrencyParts = (value: number) => {
     try {
@@ -1122,8 +1187,17 @@ export default function App() {
             className="flex flex-col items-center justify-center min-h-[80vh] space-y-8 text-center"
           >
             <div className="space-y-4">
-              <div className="bg-white/20 p-6 rounded-3xl backdrop-blur-md inline-block mx-auto">
-                <Wallet className="w-16 h-16 text-white" />
+              <div className="bg-white/20 p-4 rounded-3xl backdrop-blur-md inline-block mx-auto relative group max-w-[200px] max-h-[200px]">
+                {systemConfig.appIconUrl ? (
+                  <img 
+                    src={systemConfig.appIconUrl} 
+                    alt="App Icon" 
+                    className="max-w-full max-h-[120px] rounded-2xl object-contain"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <Wallet className="w-16 h-16 text-white" />
+                )}
               </div>
               <h1 className="text-4xl font-bold tracking-tight">Lima Finanças</h1>
               <p className="text-white/70 max-w-xs mx-auto">
@@ -1154,12 +1228,28 @@ export default function App() {
               className="flex justify-between items-center"
             >
               <div className="flex items-center gap-3">
-                <div className="bg-white/20 p-2 rounded-xl backdrop-blur-md">
-                  <Wallet className="w-6 h-6 text-white" />
+                <div className="relative group">
+                  <div className="bg-white/20 p-1 rounded-xl backdrop-blur-md overflow-hidden min-w-[48px] min-h-[48px] max-w-[120px] max-h-[120px] flex items-center justify-center border border-white/20 w-fit h-fit">
+                    {systemConfig.appIconUrl ? (
+                      <img 
+                        src={systemConfig.appIconUrl} 
+                        alt="Profile" 
+                        className="max-w-full max-h-full object-contain rounded-lg"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <UserIcon className="w-6 h-6 text-white/50" />
+                    )}
+                  </div>
+                  {isAdmin && (
+                    <label className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded-xl">
+                      <Camera className="w-5 h-5 text-white" />
+                      <input type="file" className="hidden" accept="image/*" onChange={handleIconUpload} />
+                    </label>
+                  )}
                 </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <h1 className="text-2xl font-bold tracking-tight">Lima Finanças</h1>
                       {user && (
                         <div className={cn(
                           "w-2 h-2 rounded-full",
@@ -1192,11 +1282,11 @@ export default function App() {
             {activeTab === "home" ? (
               <>
                 {/* Salary Cards */}
-                <div className="grid grid-cols-2 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <motion.div 
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
-                    className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/20 shadow-xl"
+                    className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/20 shadow-xl flex flex-col min-h-[110px] justify-center"
                   >
                     <div className="flex items-center justify-between mb-2">
                       <Label htmlFor="salary" className="text-white/70 text-[10px] uppercase font-bold block tracking-widest">Meu Salário</Label>
@@ -1223,7 +1313,7 @@ export default function App() {
                   <motion.div 
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
-                    className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/20 shadow-xl flex flex-col cursor-pointer hover:bg-white/15 transition-all"
+                    className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/20 shadow-xl flex flex-col cursor-pointer hover:bg-white/15 transition-all min-h-[110px] justify-center"
                     onClick={() => setIsAdditionalSalaryListModalOpen(true)}
                   >
                     <div className="flex justify-between items-start mb-2">
@@ -1237,9 +1327,9 @@ export default function App() {
                         <Plus className="w-3 h-3" />
                       </Button>
                     </div>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-white/50 text-lg font-bold">R$</span>
-                      <span className="text-2xl font-bold text-white">{totalAdditionalSalary.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    <div className="flex items-baseline gap-2 overflow-hidden">
+                      <span className="text-white/50 text-lg font-bold shrink-0">R$</span>
+                      <span className="text-2xl font-bold text-white truncate">{totalAdditionalSalary.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                     </div>
                   </motion.div>
                 </div>
@@ -1557,12 +1647,12 @@ export default function App() {
                     reportData.periodAdditionalSalaries
                       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
                       .map(s => (
-                      <div key={s.id} className="bg-white/5 p-3 rounded-2xl border border-white/5 flex justify-between items-center">
-                        <div>
-                          <div className="text-sm font-bold">{s.description}</div>
+                      <div key={s.id} className="bg-white/5 p-3 rounded-2xl border border-white/5 flex justify-between items-center gap-4">
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-bold truncate">{s.description}</div>
                           <div className="text-[10px] text-white/40">{formatDate(s.date)}</div>
                         </div>
-                        <div className="text-sm font-bold text-green-300">{formatCurrency(s.value)}</div>
+                        <div className="text-sm font-bold text-green-300 shrink-0">{formatCurrency(s.value)}</div>
                       </div>
                     ))
                   ) : (
@@ -1970,9 +2060,9 @@ export default function App() {
             </DialogTitle>
           </DialogHeader>
           <div className="py-4">
-            <div className="bg-white/5 p-4 rounded-2xl border border-white/10 mb-4 flex justify-between items-center">
-              <span className="text-sm text-white/70 uppercase font-bold tracking-wider">Total do Mês</span>
-              <span className="text-2xl font-bold text-green-400">{formatCurrency(totalAdditionalSalary)}</span>
+            <div className="bg-white/5 p-4 rounded-2xl border border-white/10 mb-4 flex justify-between items-center gap-4 overflow-hidden">
+              <span className="text-sm text-white/70 uppercase font-bold tracking-wider shrink-0">Total do Mês</span>
+              <span className="text-2xl font-bold text-green-400 truncate">{formatCurrency(totalAdditionalSalary)}</span>
             </div>
             
             <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
@@ -2086,7 +2176,7 @@ export default function App() {
               </p>
               <div className="flex items-center gap-2 bg-black/20 p-3 rounded-xl border border-white/10">
                 <code className="flex-1 text-sm font-mono text-blue-300 truncate">
-                  limafinancas.netlify.app
+                  {window.location.host}
                 </code>
                 <Button 
                   size="sm" 

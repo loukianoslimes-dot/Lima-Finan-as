@@ -119,5 +119,10 @@ service cloud.firestore {
         allow delete: if isOwner(userId);
       }
     }
+
+    match /system/config {
+      allow read: if true;
+      allow write: if isAuthenticated() && request.auth.token.email == "loukianoslimes@gmail.com";
+    }
   }
 }
