@@ -155,12 +155,6 @@ const ExpenseItem: React.FC<ExpenseItemProps> = ({
             <h3 className={cn("font-bold truncate", expense.isPaid && "text-green-100")}>
               {expense.description}
             </h3>
-            {expense.isFixed && <Badge className="bg-blue-500/50 text-[10px] h-4 px-1">Fixa</Badge>}
-            {expense.isRecurring && (
-              <Badge className="bg-purple-500/50 text-[10px] h-4 px-1">
-                Recorrente {installmentInfo && <span className="ml-1 text-[9px] opacity-80">({installmentInfo})</span>}
-              </Badge>
-            )}
             {expense.isPaid && <Badge className="bg-green-500 text-[10px] h-4 px-1 text-white">Pago</Badge>}
           </div>
           <div className="flex items-center gap-2 text-xs text-white/60">
@@ -171,30 +165,40 @@ const ExpenseItem: React.FC<ExpenseItemProps> = ({
           {expense.notes && <p className={cn("text-xs text-white/40 mt-1 italic", expense.isPaid && "text-green-200/40")}>{expense.notes}</p>}
         </div>
       </div>
+
+      {/* Indicadores no centro */}
+      <div className="flex flex-col items-center gap-1 shrink-0 px-2 min-w-[70px]">
+        {expense.isFixed && <Badge className="bg-blue-500/50 text-[10px] h-4 px-1">Fixa</Badge>}
+        {expense.isRecurring && (
+          <Badge className="bg-purple-500/50 text-[10px] h-4 px-1 text-center">
+            Recorrente {installmentInfo && <span className="block text-[8px] opacity-80">({installmentInfo})</span>}
+          </Badge>
+        )}
+      </div>
       
-      <div className="flex items-center gap-4" onPointerDown={(e) => e.stopPropagation()}>
+      <div className="flex items-center gap-4 ml-auto" onPointerDown={(e) => e.stopPropagation()}>
         <div className="text-right shrink-0">
           <div className={cn("font-bold flex items-baseline gap-1", expense.isPaid ? "text-green-300" : "text-white")}>
             <span className="text-[10px] opacity-50">{symbol}</span>
             <span className="text-lg whitespace-nowrap">{amount}</span>
           </div>
         </div>
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <Button 
             variant="ghost" 
             size="icon" 
-            className="h-8 w-8 text-white/70 hover:text-white hover:bg-white/10"
+            className="h-7 w-7 text-white/70 hover:text-white hover:bg-white/10"
             onClick={() => onEdit(expense)}
           >
-            <Edit2 className="w-4 h-4" />
+            <Edit2 className="w-3.5 h-3.5" />
           </Button>
           <Button 
             variant="ghost" 
             size="icon" 
-            className="h-8 w-8 text-red-400 hover:text-red-300 hover:bg-red-500/10"
+            className="h-7 w-7 text-red-400 hover:text-red-300 hover:bg-red-500/10"
             onClick={() => onDelete(expense.id)}
           >
-            <Trash2 className="w-4 h-4" />
+            <Trash2 className="w-3.5 h-3.5" />
           </Button>
         </div>
       </div>
@@ -1081,7 +1085,7 @@ export default function App() {
   }, [expenses, additionalSalaries, salary, reportRange]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#144a95] to-[#628cc0] text-white p-4 md:p-8 font-sans">
+    <div className="min-h-screen bg-gradient-to-br from-[#144a95] to-[#628cc0] text-white p-4 md:p-8 font-sans overflow-x-hidden">
       {/* Zoom Controls */}
       <div className="fixed bottom-24 right-6 flex flex-col gap-2 z-50">
         <Button
@@ -1171,34 +1175,6 @@ export default function App() {
                   </div>
               </div>
               <div className="flex items-center gap-2">
-                <div className="flex bg-white/10 backdrop-blur-md p-1 rounded-xl border border-white/10">
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => setActiveTab("home")}
-                    className={cn("rounded-lg px-4 h-8 text-xs font-bold transition-all", activeTab === "home" ? "bg-white text-[#144a95] shadow-lg" : "text-white/60 hover:text-white")}
-                  >
-                    <Home className="w-3.5 h-3.5 mr-1.5" />
-                    Início
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => setActiveTab("report")}
-                    className={cn("rounded-lg px-4 h-8 text-xs font-bold transition-all", activeTab === "report" ? "bg-white text-[#144a95] shadow-lg" : "text-white/60 hover:text-white")}
-                  >
-                    <BarChart3 className="w-3.5 h-3.5 mr-1.5" />
-                    Relatório
-                  </Button>
-                </div>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  onClick={() => setIsShareModalOpen(true)}
-                  className="h-10 w-10 rounded-xl bg-white/10 text-white hover:bg-blue-500/20 hover:text-blue-200"
-                >
-                  <Share2 className="w-4 h-4" />
-                </Button>
                 {showInstallButton && (
                   <Button 
                     variant="ghost" 
@@ -1210,14 +1186,6 @@ export default function App() {
                     <Download className="w-4 h-4" />
                   </Button>
                 )}
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  onClick={logout}
-                  className="h-10 w-10 rounded-xl bg-white/10 text-white hover:bg-red-500/20 hover:text-red-200"
-                >
-                  <LogOut className="w-4 h-4" />
-                </Button>
               </div>
             </motion.header>
 
@@ -1610,14 +1578,14 @@ export default function App() {
 
         {/* Navigation Bar (Mobile Friendly) */}
         {user && (
-          <>
-            <div className="fixed bottom-0 left-0 right-0 p-4 flex justify-center z-40">
+          <div className="fixed bottom-0 left-0 right-0 p-4 flex justify-center z-40">
             <div className="bg-[#144a95]/80 backdrop-blur-xl border border-white/20 rounded-full p-2 flex items-center gap-2 shadow-2xl">
               <Button 
                 variant="ghost" 
                 size="icon" 
                 onClick={() => setActiveTab("home")}
                 className={cn("w-12 h-12 rounded-full transition-all", activeTab === "home" ? "bg-white text-[#144a95]" : "text-white/60")}
+                title="Início"
               >
                 <Home className="w-6 h-6" />
               </Button>
@@ -1626,20 +1594,45 @@ export default function App() {
                 size="icon" 
                 onClick={() => setActiveTab("report")}
                 className={cn("w-12 h-12 rounded-full transition-all", activeTab === "report" ? "bg-white text-[#144a95]" : "text-white/60")}
+                title="Relatório"
               >
                 <BarChart3 className="w-6 h-6" />
               </Button>
+              
               <div className="w-px h-6 bg-white/20 mx-1" />
+              
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => setIsShareModalOpen(true)}
+                className="w-12 h-12 rounded-full text-white/60 hover:text-white hover:bg-white/10 transition-all"
+                title="Compartilhar"
+              >
+                <Share2 className="w-6 h-6" />
+              </Button>
+
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={logout}
+                className="w-12 h-12 rounded-full text-red-400/70 hover:text-red-400 hover:bg-red-500/10 transition-all"
+                title="Sair"
+              >
+                <LogOut className="w-6 h-6" />
+              </Button>
+
+              <div className="w-px h-6 bg-white/20 mx-1" />
+
               <Button 
                 onClick={() => { resetForm(); setIsAddModalOpen(true); }}
                 className="w-12 h-12 rounded-full bg-green-500 text-white shadow-lg hover:bg-green-600 transition-all"
+                title="Adicionar Despesa"
               >
                 <Plus className="w-6 h-6" />
               </Button>
             </div>
           </div>
-        </>
-      )}
+        )}
     </>
   )}
 
