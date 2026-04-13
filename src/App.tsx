@@ -114,6 +114,23 @@ const ExpenseItem: React.FC<ExpenseItemProps> = ({
   formatDate,
   installmentInfo
 }) => {
+  // Helper to split currency for better layout control
+  const formatCurrencyParts = (value: number) => {
+    try {
+      const parts = new Intl.NumberFormat("pt-BR", {
+        style: "currency",
+        currency: "BRL",
+      }).formatToParts(value);
+      const symbol = parts.find(p => p.type === 'currency')?.value || "R$";
+      const amount = parts.filter(p => p.type !== 'currency').map(p => p.value).join('').trim();
+      return { symbol, amount };
+    } catch (e) {
+      return { symbol: "R$", amount: value.toFixed(2).replace('.', ',') };
+    }
+  };
+
+  const { symbol, amount } = formatCurrencyParts(expense.value);
+
   return (
     <motion.div
       initial={{ opacity: 0, x: -20 }}
@@ -156,9 +173,10 @@ const ExpenseItem: React.FC<ExpenseItemProps> = ({
       </div>
       
       <div className="flex items-center gap-4" onPointerDown={(e) => e.stopPropagation()}>
-        <div className="text-right">
-          <div className={cn("font-bold text-lg", expense.isPaid ? "text-green-300" : "text-white")}>
-            {formatCurrency(expense.value)}
+        <div className="text-right shrink-0">
+          <div className={cn("font-bold flex items-baseline gap-1", expense.isPaid ? "text-green-300" : "text-white")}>
+            <span className="text-[10px] opacity-50">{symbol}</span>
+            <span className="text-lg whitespace-nowrap">{amount}</span>
           </div>
         </div>
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -199,6 +217,23 @@ const AdditionalSalaryItem: React.FC<AdditionalSalaryItemProps> = ({
   formatCurrency, 
   formatDate 
 }) => {
+  // Helper to split currency for better layout control
+  const formatCurrencyParts = (value: number) => {
+    try {
+      const parts = new Intl.NumberFormat("pt-BR", {
+        style: "currency",
+        currency: "BRL",
+      }).formatToParts(value);
+      const symbol = parts.find(p => p.type === 'currency')?.value || "R$";
+      const amount = parts.filter(p => p.type !== 'currency').map(p => p.value).join('').trim();
+      return { symbol, amount };
+    } catch (e) {
+      return { symbol: "R$", amount: value.toFixed(2).replace('.', ',') };
+    }
+  };
+
+  const { symbol, amount } = formatCurrencyParts(salary.value);
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: 10 }}
@@ -211,7 +246,10 @@ const AdditionalSalaryItem: React.FC<AdditionalSalaryItemProps> = ({
         <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onEdit(salary)}>
           <div className="flex justify-between items-center mb-1">
             <span className="font-bold text-white truncate mr-2">{salary.description}</span>
-            <span className="font-bold text-green-300 shrink-0">{formatCurrency(salary.value)}</span>
+            <div className="font-bold text-green-300 shrink-0 flex items-baseline gap-1">
+              <span className="text-[10px] opacity-50">{symbol}</span>
+              <span className="whitespace-nowrap">{amount}</span>
+            </div>
           </div>
           <div className="text-xs text-white/40">
             {formatDate(salary.date)}
@@ -947,11 +985,26 @@ export default function App() {
     setValidationError(null);
   };
 
+  const [zoomLevel, setZoomLevel] = useState(1);
+
+  const formatCurrencyParts = (value: number) => {
+    try {
+      const parts = new Intl.NumberFormat("pt-BR", {
+        style: "currency",
+        currency: "BRL",
+      }).formatToParts(value);
+      
+      const symbol = parts.find(p => p.type === 'currency')?.value || "R$";
+      const amount = parts.filter(p => p.type !== 'currency').map(p => p.value).join('').trim();
+      return { symbol, amount };
+    } catch (e) {
+      return { symbol: "R$", amount: value.toFixed(2).replace('.', ',') };
+    }
+  };
+
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    }).format(value);
+    const { symbol, amount } = formatCurrencyParts(value);
+    return `${symbol} ${amount}`;
   };
 
   const changeMonth = (offset: number) => {
@@ -1029,7 +1082,10 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#144a95] to-[#628cc0] text-white p-4 md:p-8 font-sans">
-      <div className="max-w-3xl mx-auto w-full space-y-6 pb-24">
+      <div 
+        className="max-w-3xl mx-auto w-full space-y-6 pb-24"
+        style={{ zoom: zoomLevel } as React.CSSProperties}
+      >
         {/* Auth Loading State */}
         {!isAuthReady ? (
           <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
@@ -1210,7 +1266,10 @@ export default function App() {
                         <ArrowUpCircle className="w-8 h-8" />
                       </div>
                       <div className="text-[10px] font-bold text-white/70 uppercase mb-1 tracking-widest">Rendimentos</div>
-                      <div className="text-xl font-bold">{formatCurrency(totalIncome)}</div>
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-xs opacity-50 font-bold">R$</span>
+                        <div className="text-xl font-bold truncate">{formatCurrencyParts(totalIncome).amount}</div>
+                      </div>
                     </Card>
                   </motion.div>
 
@@ -1220,7 +1279,10 @@ export default function App() {
                         <ArrowDownCircle className="w-8 h-8" />
                       </div>
                       <div className="text-[10px] font-bold text-white/70 uppercase mb-1 tracking-widest">Despesas</div>
-                      <div className="text-xl font-bold text-red-300">{formatCurrency(totalMonthlyExpenses)}</div>
+                      <div className="flex items-baseline gap-1 text-red-300">
+                        <span className="text-xs opacity-50 font-bold">R$</span>
+                        <div className="text-xl font-bold truncate">{formatCurrencyParts(totalMonthlyExpenses).amount}</div>
+                      </div>
                     </Card>
                   </motion.div>
 
@@ -1235,8 +1297,9 @@ export default function App() {
                         <Wallet className="w-8 h-8" />
                       </div>
                       <div className="text-[10px] font-bold text-white/70 uppercase mb-1 tracking-widest">Saldo</div>
-                      <div className={cn("text-xl font-bold", balance >= 0 ? "text-green-300" : "text-red-400")}>
-                        {formatCurrency(balance)}
+                      <div className={cn("flex items-baseline gap-1", balance >= 0 ? "text-green-300" : "text-red-400")}>
+                        <span className="text-xs opacity-50 font-bold">R$</span>
+                        <div className="text-xl font-bold truncate">{formatCurrencyParts(balance).amount}</div>
                       </div>
                     </Card>
                   </motion.div>
@@ -1529,7 +1592,26 @@ export default function App() {
 
         {/* Navigation Bar (Mobile Friendly) */}
         {user && (
-          <div className="fixed bottom-0 left-0 right-0 p-4 flex justify-center z-40">
+          <>
+            {/* Zoom Controls */}
+            <div className="fixed bottom-24 right-6 flex flex-col gap-2 z-50">
+              <Button
+                size="icon"
+                className="h-10 w-10 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 text-white shadow-2xl hover:bg-white/20"
+                onClick={() => setZoomLevel(prev => Math.min(prev + 0.1, 1.5))}
+              >
+                <Plus className="w-5 h-5" />
+              </Button>
+              <Button
+                size="icon"
+                className="h-10 w-10 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 text-white shadow-2xl hover:bg-white/20"
+                onClick={() => setZoomLevel(prev => Math.max(prev - 0.1, 0.7))}
+              >
+                <div className="w-4 h-0.5 bg-current" />
+              </Button>
+            </div>
+
+            <div className="fixed bottom-0 left-0 right-0 p-4 flex justify-center z-40">
             <div className="bg-[#144a95]/80 backdrop-blur-xl border border-white/20 rounded-full p-2 flex items-center gap-2 shadow-2xl">
               <Button 
                 variant="ghost" 
@@ -1556,10 +1638,10 @@ export default function App() {
               </Button>
             </div>
           </div>
-        )}
-      </>
-    )}
-  </div>
+        </>
+      )}
+    </>
+  )}
 
       {/* Add/Edit Expense Modal */}
       <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
@@ -2054,5 +2136,6 @@ export default function App() {
         </DialogContent>
       </Dialog>
     </div>
+  </div>
   );
 }
