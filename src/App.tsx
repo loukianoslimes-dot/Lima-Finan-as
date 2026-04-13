@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Plus, Trash2, Edit2, Wallet, ArrowUpCircle, ArrowDownCircle, ChevronLeft, ChevronRight, Calendar as CalendarIcon, BarChart3, Home, PieChart, TrendingUp, LogOut, LogIn, AlertCircle, GripVertical } from "lucide-react";
-import { motion, AnimatePresence, Reorder, useDragControls } from "motion/react";
+import { Plus, Trash2, Edit2, Wallet, ArrowUpCircle, ArrowDownCircle, ChevronLeft, ChevronRight, Calendar as CalendarIcon, BarChart3, Home, PieChart, TrendingUp, LogOut, LogIn, AlertCircle, GripVertical, Share2, Copy, Check, Download } from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
 import { 
   BarChart, 
   Bar, 
@@ -69,6 +69,7 @@ interface Expense {
   isPaid?: boolean;
   paidMonths?: string[]; // For fixed expenses: ["YYYY-MM", ...]
   order?: number;
+  installmentIndex?: number;
 }
 
 interface AdditionalSalary {
@@ -100,6 +101,7 @@ interface ExpenseItemProps {
   onDelete: (id: string) => void;
   formatCurrency: (val: number) => string;
   formatDate: (dateStr: string) => string;
+  installmentInfo?: string;
 }
 
 const ExpenseItem: React.FC<ExpenseItemProps> = ({ 
@@ -109,30 +111,21 @@ const ExpenseItem: React.FC<ExpenseItemProps> = ({
   onEdit, 
   onDelete, 
   formatCurrency, 
-  formatDate 
+  formatDate,
+  installmentInfo
 }) => {
-  const dragControls = useDragControls();
-
   return (
-    <Reorder.Item
-      value={expense}
-      dragListener={false}
-      dragControls={dragControls}
+    <motion.div
       initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 20 }}
+      layout
       className={cn(
         "group bg-white/5 hover:bg-white/10 transition-all p-4 rounded-2xl border border-white/5 flex items-center justify-between gap-4",
         expense.isPaid && "bg-green-500/20 border-green-500/40 shadow-[0_0_15px_rgba(34,197,94,0.1)]"
       )}
     >
       <div className="flex items-center gap-4 flex-1 min-w-0">
-        <div 
-          className="text-white/20 group-hover:text-white/40 transition-colors cursor-grab active:cursor-grabbing p-1 -ml-1 touch-none"
-          onPointerDown={(e) => dragControls.start(e)}
-        >
-          <GripVertical className="w-4 h-4" />
-        </div>
         <div onPointerDown={(e) => e.stopPropagation()}>
           <Checkbox 
             checked={expense.isPaid}
@@ -146,7 +139,11 @@ const ExpenseItem: React.FC<ExpenseItemProps> = ({
               {expense.description}
             </h3>
             {expense.isFixed && <Badge className="bg-blue-500/50 text-[10px] h-4 px-1">Fixa</Badge>}
-            {expense.isRecurring && <Badge className="bg-purple-500/50 text-[10px] h-4 px-1">Recorrente</Badge>}
+            {expense.isRecurring && (
+              <Badge className="bg-purple-500/50 text-[10px] h-4 px-1">
+                Recorrente {installmentInfo && <span className="ml-1 text-[9px] opacity-80">({installmentInfo})</span>}
+              </Badge>
+            )}
             {expense.isPaid && <Badge className="bg-green-500 text-[10px] h-4 px-1 text-white">Pago</Badge>}
           </div>
           <div className="flex items-center gap-2 text-xs text-white/60">
@@ -183,7 +180,7 @@ const ExpenseItem: React.FC<ExpenseItemProps> = ({
           </Button>
         </div>
       </div>
-    </Reorder.Item>
+    </motion.div>
   );
 };
 
@@ -202,23 +199,16 @@ const AdditionalSalaryItem: React.FC<AdditionalSalaryItemProps> = ({
   formatCurrency, 
   formatDate 
 }) => {
-  const dragControls = useDragControls();
-
   return (
-    <Reorder.Item 
-      value={salary}
-      dragListener={false}
-      dragControls={dragControls}
+    <motion.div 
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      layout
       className="group bg-white/5 hover:bg-white/10 p-3 rounded-2xl transition-all border border-white/5 flex items-center justify-between gap-4"
     >
       <div className="flex items-center gap-3 flex-1 min-w-0">
-        <div 
-          className="text-white/20 group-hover:text-white/40 transition-colors cursor-grab active:cursor-grabbing p-1 -ml-1 touch-none"
-          onPointerDown={(e) => dragControls.start(e)}
-        >
-          <GripVertical className="w-4 h-4" />
-        </div>
-        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onEdit(salary)} onPointerDown={(e) => e.stopPropagation()}>
+        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onEdit(salary)}>
           <div className="flex justify-between items-center mb-1">
             <span className="font-bold text-white truncate mr-2">{salary.description}</span>
             <span className="font-bold text-green-300 shrink-0">{formatCurrency(salary.value)}</span>
@@ -228,7 +218,7 @@ const AdditionalSalaryItem: React.FC<AdditionalSalaryItemProps> = ({
           </div>
         </div>
       </div>
-      <div onPointerDown={(e) => e.stopPropagation()}>
+      <div>
         <Button 
           variant="ghost" 
           size="icon" 
@@ -238,173 +228,7 @@ const AdditionalSalaryItem: React.FC<AdditionalSalaryItemProps> = ({
           <Trash2 className="w-4 h-4" />
         </Button>
       </div>
-    </Reorder.Item>
-  );
-};
-
-interface DashboardCardProps {
-  widgetId: string;
-  salary: number;
-  handleSalaryChange: (val: number) => void;
-  isSavingSalary: boolean;
-  totalAdditionalSalary: number;
-  totalIncome: number;
-  totalMonthlyExpenses: number;
-  balance: number;
-  formatCurrency: (val: number) => string;
-  year: number;
-  monthName: string;
-  changeMonth: (dir: number) => void;
-  setIsAdditionalSalaryListModalOpen: (open: boolean) => void;
-  setIsAdditionalSalaryModalOpen: (open: boolean) => void;
-  resetAdditionalSalaryForm: () => void;
-}
-
-const DashboardCard: React.FC<DashboardCardProps> = ({
-  widgetId,
-  salary,
-  handleSalaryChange,
-  isSavingSalary,
-  totalAdditionalSalary,
-  totalIncome,
-  totalMonthlyExpenses,
-  balance,
-  formatCurrency,
-  year,
-  monthName,
-  changeMonth,
-  setIsAdditionalSalaryListModalOpen,
-  setIsAdditionalSalaryModalOpen,
-  resetAdditionalSalaryForm
-}) => {
-  const dragControls = useDragControls();
-
-  return (
-    <Reorder.Item 
-      value={widgetId}
-      dragListener={false}
-      dragControls={dragControls}
-      className="touch-none"
-    >
-      <div className="relative h-full group">
-        {/* Drag Handle */}
-        <div 
-          onPointerDown={(e) => dragControls.start(e)}
-          className="absolute top-3 right-3 z-50 cursor-grab active:cursor-grabbing p-2 bg-white/10 rounded-xl hover:bg-white/20 transition-all shadow-lg border border-white/10"
-        >
-          <GripVertical className="w-5 h-5 text-white/60" />
-        </div>
-
-        {widgetId === 'salary-card' && (
-          <div className="bg-white/10 backdrop-blur-md p-6 rounded-3xl border border-white/20 shadow-xl h-full">
-            <div className="flex items-center justify-between mb-4">
-              <Label htmlFor="salary" className="text-white/70 text-xs uppercase font-bold block tracking-widest">Meu Salário</Label>
-              {isSavingSalary && (
-                <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-              )}
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-white/50 text-2xl font-bold shrink-0">R$</span>
-              <Input
-                id="salary"
-                type="number"
-                value={salary || ""}
-                onChange={(e) => {
-                  const val = parseFloat(e.target.value) || 0;
-                  handleSalaryChange(val);
-                }}
-                className="bg-transparent border-none text-4xl font-bold text-white focus-visible:ring-0 h-auto p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none w-full"
-                placeholder="0,00"
-              />
-            </div>
-          </div>
-        )}
-
-        {widgetId === 'additional-salary-card' && (
-          <div 
-            className="bg-white/10 backdrop-blur-md p-6 rounded-3xl border border-white/20 shadow-xl flex flex-col cursor-pointer hover:bg-white/15 transition-all h-full"
-            onClick={() => setIsAdditionalSalaryListModalOpen(true)}
-          >
-            <div className="flex justify-between items-start mb-4">
-              <Label className="text-white/70 text-xs uppercase font-bold block tracking-widest cursor-pointer">Salário Adicional</Label>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={(e) => { e.stopPropagation(); resetAdditionalSalaryForm(); setIsAdditionalSalaryModalOpen(true); }}
-                className="h-8 w-8 rounded-full bg-white/10 text-white hover:bg-white/20"
-              >
-                <Plus className="w-4 h-4" />
-              </Button>
-            </div>
-            <div className="flex items-baseline gap-3">
-              <span className="text-white/50 text-2xl font-bold">R$</span>
-              <span className="text-4xl font-bold text-white">{totalAdditionalSalary.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-            </div>
-            <div className="mt-4 text-xs text-white/40 flex items-center gap-2">
-              <ChevronRight className="w-3 h-3" />
-              Clique para ver detalhes
-            </div>
-          </div>
-        )}
-
-        {widgetId === 'income-summary' && (
-          <Card className="bg-white/10 backdrop-blur-md border-white/20 text-white overflow-hidden relative p-6 rounded-3xl h-full shadow-xl">
-            <div className="absolute top-0 right-0 p-4 opacity-10">
-              <ArrowUpCircle className="w-12 h-12" />
-            </div>
-            <div className="text-xs font-bold text-white/70 uppercase mb-2 tracking-widest">Rendimentos</div>
-            <div className="text-3xl font-bold">{formatCurrency(totalIncome)}</div>
-          </Card>
-        )}
-
-        {widgetId === 'expenses-summary' && (
-          <Card className="bg-white/10 backdrop-blur-md border-white/20 text-white overflow-hidden relative p-6 rounded-3xl h-full shadow-xl">
-            <div className="absolute top-0 right-0 p-4 opacity-10">
-              <ArrowDownCircle className="w-12 h-12" />
-            </div>
-            <div className="text-xs font-bold text-white/70 uppercase mb-2 tracking-widest">Despesas</div>
-            <div className="text-3xl font-bold text-red-300">{formatCurrency(totalMonthlyExpenses)}</div>
-          </Card>
-        )}
-
-        {widgetId === 'balance-summary' && (
-          <Card className="bg-white/10 backdrop-blur-md border-white/20 text-white overflow-hidden relative p-6 rounded-3xl h-full shadow-xl">
-            <div className="absolute top-0 right-0 p-4 opacity-10">
-              <Wallet className="w-12 h-12" />
-            </div>
-            <div className="text-xs font-bold text-white/70 uppercase mb-2 tracking-widest">Saldo</div>
-            <div className={cn("text-3xl font-bold", balance >= 0 ? "text-green-300" : "text-red-400")}>
-              {formatCurrency(balance)}
-            </div>
-          </Card>
-        )}
-
-        {widgetId === 'month-selector' && (
-          <div className="flex items-center justify-center gap-6 bg-white/10 backdrop-blur-md p-6 rounded-3xl border border-white/20 h-full shadow-xl">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => changeMonth(-1)} 
-              className="text-white hover:bg-white/10 h-12 w-12 rounded-2xl"
-            >
-              <ChevronLeft className="w-6 h-6" />
-            </Button>
-            <div className="text-center min-w-[140px]">
-              <div className="text-xs uppercase font-bold text-white/50 tracking-widest mb-1">{year}</div>
-              <div className="text-2xl font-bold capitalize">{monthName}</div>
-            </div>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => changeMonth(1)} 
-              className="text-white hover:bg-white/10 h-12 w-12 rounded-2xl"
-            >
-              <ChevronRight className="w-6 h-6" />
-            </Button>
-          </div>
-        )}
-      </div>
-    </Reorder.Item>
+    </motion.div>
   );
 };
 
@@ -416,14 +240,6 @@ export default function App() {
   const [validationError, setValidationError] = useState<string | null>(null);
 
   const [isSavingSalary, setIsSavingSalary] = useState(false);
-  const [dashboardOrder, setDashboardOrder] = useState<string[]>([
-    'salary-card', 
-    'additional-salary-card', 
-    'income-summary', 
-    'expenses-summary', 
-    'balance-summary', 
-    'month-selector'
-  ]);
   const [salaryTimeout, setSalaryTimeout] = useState<NodeJS.Timeout | null>(null);
 
   const [salary, setSalary] = useState<number>(0);
@@ -450,6 +266,10 @@ export default function App() {
   const [isRecurringActionModalOpen, setIsRecurringActionModalOpen] = useState(false);
   const [isDeleteConfirmModalOpen, setIsDeleteConfirmModalOpen] = useState(false);
   const [isDeleteAdditionalSalaryConfirmModalOpen, setIsDeleteAdditionalSalaryConfirmModalOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallButton, setShowInstallButton] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [expenseToDelete, setExpenseToDelete] = useState<string | null>(null);
   const [additionalSalaryToDelete, setAdditionalSalaryToDelete] = useState<string | null>(null);
   const [recurringActionType, setRecurringActionType] = useState<"edit" | "delete" | null>(null);
@@ -465,6 +285,34 @@ export default function App() {
     });
     return () => unsubscribe();
   }, []);
+
+  // PWA Install Prompt Listener
+  useEffect(() => {
+    const handler = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstallButton(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handler);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handler);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      console.log('User accepted the install prompt');
+    } else {
+      console.log('User dismissed the install prompt');
+    }
+    setDeferredPrompt(null);
+    setShowInstallButton(false);
+  };
 
   // Firestore Real-time Listeners
   useEffect(() => {
@@ -499,10 +347,6 @@ export default function App() {
           }
           return prev;
         });
-
-        if (data.dashboardOrder && Array.isArray(data.dashboardOrder)) {
-          setDashboardOrder(data.dashboardOrder);
-        }
       }
       setIsSyncing(docSnap.metadata.hasPendingWrites || docSnap.metadata.fromCache);
     }, (error) => handleFirestoreError(error, OperationType.GET, settingsPath));
@@ -537,18 +381,6 @@ export default function App() {
       additionalUnsubscribe();
     };
   }, [user]);
-
-  const handleReorderDashboard = async (newOrder: string[]) => {
-    setDashboardOrder(newOrder);
-    if (!user) return;
-    
-    const path = `users/${user.uid}/settings/main`;
-    try {
-      await updateDoc(doc(db, path), { dashboardOrder: newOrder });
-    } catch (error) {
-      console.error("Error updating dashboard order:", error);
-    }
-  };
 
   const handleReorderExpenses = async (newOrder: Expense[]) => {
     setDisplayExpenses(newOrder);
@@ -632,6 +464,12 @@ export default function App() {
     setSalaryTimeout(timeout);
   };
 
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText("https://limafinancas.netlify.app");
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   const handleAddExpense = async () => {
     if (!user) return;
     
@@ -699,7 +537,8 @@ export default function App() {
             batch.set(doc(db, path), sanitizeData({
               ...expenseData,
               date: `${ny}-${nm}-${nd}`,
-              parentId: i === 0 ? null : parentId,
+              parentId: parentId,
+              installmentIndex: i + 1,
               order: nextOrder,
             }));
           }
@@ -949,43 +788,41 @@ export default function App() {
     };
   });
 
-  const filteredExpenses = useMemo(() => {
+  const { fixedExpenses, variableExpenses } = useMemo(() => {
     const year = currentDate.getFullYear();
     const month = String(currentDate.getMonth() + 1).padStart(2, '0');
     const currentMonthStr = `${year}-${month}`;
-    const result: Expense[] = [];
+    const fixed: Expense[] = [];
+    const variable: Expense[] = [];
 
     expenses.forEach(expense => {
       const expenseMonthStr = expense.date.slice(0, 7);
 
       if (expense.isFixed) {
-        // Show if it started on or before this month
         if (expenseMonthStr <= currentMonthStr) {
-          // Create a virtual instance for this month
-          result.push({
+          fixed.push({
             ...expense,
-            // Override date for display to match the current month being viewed
-            // but keep the day from the original date
             date: `${currentMonthStr}-${expense.date.slice(8, 10)}`,
             isPaid: expense.paidMonths?.includes(currentMonthStr) || false
           });
         }
       } else {
-        // Normal or generated recurring items
         if (expenseMonthStr === currentMonthStr) {
-          result.push(expense);
+          variable.push(expense);
         }
       }
     });
 
-    // Sort by order if available, otherwise by date
-    return result.sort((a, b) => {
-      if (a.order !== undefined && b.order !== undefined) {
-        return a.order - b.order;
-      }
-      return new Date(a.date).getTime() - new Date(b.date).getTime();
-    });
+    // Sort fixed alphabetically
+    fixed.sort((a, b) => a.description.localeCompare(b.description));
+
+    // Sort variable by date
+    variable.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    return { fixedExpenses: fixed, variableExpenses: variable };
   }, [expenses, currentDate]);
+
+  const filteredExpenses = useMemo(() => [...fixedExpenses, ...variableExpenses], [fixedExpenses, variableExpenses]);
 
   const filteredAdditionalSalaries = useMemo(() => {
     const year = currentDate.getFullYear();
@@ -1170,18 +1007,24 @@ export default function App() {
     }
 
     // Category Data
-    const categoryTotals: Record<string, number> = {};
+    const categoryTotals: Record<string, { total: number, count: number }> = {};
     periodExpenses.forEach(e => {
-      categoryTotals[e.category] = (categoryTotals[e.category] || 0) + e.value;
+      if (!categoryTotals[e.category]) {
+        categoryTotals[e.category] = { total: 0, count: 0 };
+      }
+      categoryTotals[e.category].total += e.value;
+      categoryTotals[e.category].count += 1;
     });
 
     const pieData = Object.entries(categoryTotals)
-      .map(([name, value]) => ({ name, value }))
+      .map(([name, data]) => ({ name, value: data.total, count: data.count }))
       .sort((a, b) => b.value - a.value);
+
+    const totalExpenses = pieData.reduce((acc, curr) => acc + curr.value, 0);
 
     const COLORS = ['#4ade80', '#60a5fa', '#f87171', '#fbbf24', '#a78bfa', '#f472b6', '#2dd4bf', '#fb923c'];
 
-    return { monthlyData, pieData, COLORS, periodAdditionalSalaries };
+    return { monthlyData, pieData, totalExpenses, COLORS, periodAdditionalSalaries };
   }, [expenses, additionalSalaries, salary, reportRange]);
 
   return (
@@ -1218,8 +1061,9 @@ export default function App() {
               Entrar com Google
             </Button>
             
-            <div className="text-xs text-white/40 max-w-[200px]">
-              Ao entrar, seus dados serão salvos com segurança na nuvem.
+            <div className="text-xs text-white/40 max-w-[200px] space-y-2">
+              <p>Ao entrar, seus dados serão salvos com segurança na nuvem.</p>
+              <p className="text-blue-300/60">Dica: Você pode instalar este app no seu celular para acesso rápido!</p>
             </div>
           </motion.div>
         ) : (
@@ -1276,6 +1120,25 @@ export default function App() {
                 <Button 
                   variant="ghost" 
                   size="icon" 
+                  onClick={() => setIsShareModalOpen(true)}
+                  className="h-10 w-10 rounded-xl bg-white/10 text-white hover:bg-blue-500/20 hover:text-blue-200"
+                >
+                  <Share2 className="w-4 h-4" />
+                </Button>
+                {showInstallButton && (
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={handleInstallClick}
+                    className="h-10 w-10 rounded-xl bg-white/10 text-yellow-400 hover:bg-yellow-500/20 hover:text-yellow-200"
+                    title="Instalar App"
+                  >
+                    <Download className="w-4 h-4" />
+                  </Button>
+                )}
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
                   onClick={logout}
                   className="h-10 w-10 rounded-xl bg-white/10 text-white hover:bg-red-500/20 hover:text-red-200"
                 >
@@ -1286,81 +1149,229 @@ export default function App() {
 
             {activeTab === "home" ? (
               <>
-                <Reorder.Group 
-                  axis="y" 
-                  values={dashboardOrder} 
-                  onReorder={handleReorderDashboard}
-                  className="space-y-4"
-                >
-                  {dashboardOrder.map((widgetId) => (
-                    <DashboardCard
-                      key={widgetId}
-                      widgetId={widgetId}
-                      salary={salary}
-                      handleSalaryChange={handleSalaryChange}
-                      isSavingSalary={isSavingSalary}
-                      totalAdditionalSalary={totalAdditionalSalary}
-                      totalIncome={totalIncome}
-                      totalMonthlyExpenses={totalMonthlyExpenses}
-                      balance={balance}
-                      formatCurrency={formatCurrency}
-                      year={year}
-                      monthName={monthName}
-                      changeMonth={changeMonth}
-                      setIsAdditionalSalaryListModalOpen={setIsAdditionalSalaryListModalOpen}
-                      setIsAdditionalSalaryModalOpen={setIsAdditionalSalaryModalOpen}
-                      resetAdditionalSalaryForm={resetAdditionalSalaryForm}
-                    />
-                  ))}
-                </Reorder.Group>
+                {/* Salary Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <motion.div 
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className="bg-white/10 backdrop-blur-md p-6 rounded-3xl border border-white/20 shadow-xl"
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <Label htmlFor="salary" className="text-white/70 text-xs uppercase font-bold block tracking-widest">Meu Salário</Label>
+                      {isSavingSalary && (
+                        <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-white/50 text-2xl font-bold shrink-0">R$</span>
+                      <Input
+                        id="salary"
+                        type="number"
+                        value={salary || ""}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value) || 0;
+                          handleSalaryChange(val);
+                        }}
+                        className="bg-transparent border-none text-4xl font-bold text-white focus-visible:ring-0 h-auto p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none w-full"
+                        placeholder="0,00"
+                      />
+                    </div>
+                  </motion.div>
 
-            {/* Expenses List */}
+                  <motion.div 
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className="bg-white/10 backdrop-blur-md p-6 rounded-3xl border border-white/20 shadow-xl flex flex-col cursor-pointer hover:bg-white/15 transition-all"
+                    onClick={() => setIsAdditionalSalaryListModalOpen(true)}
+                  >
+                    <div className="flex justify-between items-start mb-4">
+                      <Label className="text-white/70 text-xs uppercase font-bold block tracking-widest cursor-pointer">Salário Adicional</Label>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={(e) => { e.stopPropagation(); resetAdditionalSalaryForm(); setIsAdditionalSalaryModalOpen(true); }}
+                        className="h-8 w-8 rounded-full bg-white/10 text-white hover:bg-white/20"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    <div className="flex items-baseline gap-3">
+                      <span className="text-white/50 text-2xl font-bold">R$</span>
+                      <span className="text-4xl font-bold text-white">{totalAdditionalSalary.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="mt-4 text-xs text-white/40 flex items-center gap-2">
+                      <ChevronRight className="w-3 h-3" />
+                      Clique para ver detalhes
+                    </div>
+                  </motion.div>
+                </div>
+
+                {/* Summary Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.1 }}>
+                    <Card className="bg-white/10 backdrop-blur-md border-white/20 text-white overflow-hidden relative p-6 rounded-3xl h-full shadow-xl">
+                      <div className="absolute top-0 right-0 p-4 opacity-10">
+                        <ArrowUpCircle className="w-12 h-12" />
+                      </div>
+                      <div className="text-xs font-bold text-white/70 uppercase mb-2 tracking-widest">Rendimentos</div>
+                      <div className="text-3xl font-bold">{formatCurrency(totalIncome)}</div>
+                    </Card>
+                  </motion.div>
+
+                  <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.2 }}>
+                    <Card className="bg-white/10 backdrop-blur-md border-white/20 text-white overflow-hidden relative p-6 rounded-3xl h-full shadow-xl">
+                      <div className="absolute top-0 right-0 p-4 opacity-10">
+                        <ArrowDownCircle className="w-12 h-12" />
+                      </div>
+                      <div className="text-xs font-bold text-white/70 uppercase mb-2 tracking-widest">Despesas</div>
+                      <div className="text-3xl font-bold text-red-300">{formatCurrency(totalMonthlyExpenses)}</div>
+                    </Card>
+                  </motion.div>
+
+                  <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3 }}>
+                    <Card className="bg-white/10 backdrop-blur-md border-white/20 text-white overflow-hidden relative p-6 rounded-3xl h-full shadow-xl">
+                      <div className="absolute top-0 right-0 p-4 opacity-10">
+                        <Wallet className="w-12 h-12" />
+                      </div>
+                      <div className="text-xs font-bold text-white/70 uppercase mb-2 tracking-widest">Saldo</div>
+                      <div className={cn("text-3xl font-bold", balance >= 0 ? "text-green-300" : "text-red-400")}>
+                        {formatCurrency(balance)}
+                      </div>
+                    </Card>
+                  </motion.div>
+                </div>
+
+                {/* Month Selector */}
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.35 }}
+                  className="flex items-center justify-center gap-6 bg-white/10 backdrop-blur-md p-6 rounded-3xl border border-white/20 shadow-xl"
+                >
+                  <Button variant="ghost" size="icon" onClick={() => changeMonth(-1)} className="text-white hover:bg-white/10 h-12 w-12 rounded-2xl">
+                    <ChevronLeft className="w-6 h-6" />
+                  </Button>
+                  <div className="text-center min-w-[160px]">
+                    <div className="text-xs uppercase font-bold text-white/50 tracking-widest mb-1">{year}</div>
+                    <div className="text-2xl font-bold capitalize">{monthName}</div>
+                  </div>
+                  <Button variant="ghost" size="icon" onClick={() => changeMonth(1)} className="text-white hover:bg-white/10 h-12 w-12 rounded-2xl">
+                    <ChevronRight className="w-6 h-6" />
+                  </Button>
+                </motion.div>
+
+            {/* Fixed Expenses Card */}
+            {fixedExpenses.length > 0 && (
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                className="bg-white/10 backdrop-blur-md rounded-3xl border border-white/20 shadow-2xl overflow-hidden"
+              >
+                <div className="p-6 border-b border-white/10 flex justify-between items-center">
+                  <h2 className="text-xl font-bold">Despesas Fixas</h2>
+                  <Badge variant="outline" className="text-white border-white/30">
+                    {fixedExpenses.length} itens
+                  </Badge>
+                </div>
+                <div className="p-6 space-y-3">
+                  {fixedExpenses.map((expense) => {
+                    return (
+                      <ExpenseItem
+                        key={`${expense.id}-${currentDate.toISOString().slice(0, 7)}`}
+                        expense={expense}
+                        currentMonthStr={currentDate.toISOString().slice(0, 7)}
+                        onTogglePaid={handleTogglePaid}
+                        onEdit={handleEditExpense}
+                        onDelete={handleDeleteExpense}
+                        formatCurrency={formatCurrency}
+                        formatDate={formatDate}
+                      />
+                    );
+                  })}
+                </div>
+              </motion.div>
+            )}
+
+            {/* Variable Expenses List */}
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
+              transition={{ delay: 0.45 }}
               className="bg-white/10 backdrop-blur-md rounded-3xl border border-white/20 shadow-2xl overflow-hidden"
             >
               <div className="p-6 border-b border-white/10 flex justify-between items-center">
-                <h2 className="text-xl font-bold">Despesas de {monthName}</h2>
+                <h2 className="text-xl font-bold">Outras Despesas</h2>
                 <Badge variant="outline" className="text-white border-white/30">
-                  {filteredExpenses.length} itens
+                  {variableExpenses.length} itens
                 </Badge>
               </div>
               
               <div className="p-6">
-                <div className="space-y-4">
-                  <AnimatePresence mode="popLayout">
-                    {displayExpenses.length === 0 ? (
-                      <motion.div 
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="text-center py-12 text-white/50"
-                      >
-                        Nenhuma despesa para este mês.
-                      </motion.div>
-                    ) : (
-                      <Reorder.Group 
-                        axis="y" 
-                        values={displayExpenses} 
-                        onReorder={handleReorderExpenses}
-                        className="space-y-3"
-                      >
-                        {displayExpenses.map((expense) => (
-                          <ExpenseItem
-                            key={`${expense.id}-${currentDate.toISOString().slice(0, 7)}`}
-                            expense={expense}
-                            currentMonthStr={currentDate.toISOString().slice(0, 7)}
-                            onTogglePaid={handleTogglePaid}
-                            onEdit={handleEditExpense}
-                            onDelete={handleDeleteExpense}
-                            formatCurrency={formatCurrency}
-                            formatDate={formatDate}
-                          />
-                        ))}
-                      </Reorder.Group>
-                    )}
-                  </AnimatePresence>
+                <div className="space-y-6">
+                  {variableExpenses.length === 0 ? (
+                    <div className="text-center py-12 text-white/50">
+                      Nenhuma outra despesa para este mês.
+                    </div>
+                  ) : (
+                    (() => {
+                      const grouped: Record<string, Expense[]> = {};
+                      variableExpenses.forEach(e => {
+                        if (!grouped[e.date]) grouped[e.date] = [];
+                        grouped[e.date].push(e);
+                      });
+
+                      return Object.keys(grouped).sort().map(dateStr => {
+                        const date = new Date(dateStr + "T12:00:00");
+                        const dayOfWeek = date.toLocaleString('pt-BR', { weekday: 'long' });
+                        const formattedDate = formatDate(dateStr);
+
+                        return (
+                          <div key={dateStr} className="space-y-3">
+                            <div className="flex items-center gap-3">
+                              <div className="h-px flex-1 bg-white/10" />
+                              <div className="text-[10px] uppercase font-bold text-white/40 tracking-widest flex items-center gap-2">
+                                <CalendarIcon className="w-3 h-3" />
+                                {formattedDate} • <span className="text-blue-300">{dayOfWeek}</span>
+                              </div>
+                              <div className="h-px flex-1 bg-white/10" />
+                            </div>
+                            <div className="space-y-3">
+                              {grouped[dateStr].map(expense => {
+                                let installmentInfo = "";
+                                if (expense.isRecurring && expense.repeatCount && expense.repeatCount > 1) {
+                                  if (expense.installmentIndex) {
+                                    installmentInfo = `${expense.installmentIndex}x${expense.repeatCount}`;
+                                  } else if (expense.parentId) {
+                                    const siblings = expenses
+                                      .filter(e => e.parentId === expense.parentId)
+                                      .sort((a, b) => a.date.localeCompare(b.date));
+                                    const index = siblings.findIndex(s => s.id === expense.id);
+                                    if (index !== -1) {
+                                      installmentInfo = `${index + 1}x${expense.repeatCount}`;
+                                    }
+                                  }
+                                }
+                                return (
+                                  <ExpenseItem
+                                    key={`${expense.id}-${currentDate.toISOString().slice(0, 7)}`}
+                                    expense={expense}
+                                    currentMonthStr={currentDate.toISOString().slice(0, 7)}
+                                    onTogglePaid={handleTogglePaid}
+                                    onEdit={handleEditExpense}
+                                    onDelete={handleDeleteExpense}
+                                    formatCurrency={formatCurrency}
+                                    formatDate={formatDate}
+                                    installmentInfo={installmentInfo}
+                                  />
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()
+                  )}
                 </div>
               </div>
             </motion.div>
@@ -1465,16 +1476,23 @@ export default function App() {
                     </RePieChart>
                   </ResponsiveContainer>
                 </div>
-                <div className="mt-4 space-y-2">
-                  {reportData.pieData.slice(0, 4).map((item, index) => (
+                <div className="mt-4 space-y-2 border-t border-white/10 pt-4">
+                  {reportData.pieData.map((item, index) => (
                     <div key={item.name} className="flex justify-between items-center text-xs">
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full" style={{ backgroundColor: reportData.COLORS[index % reportData.COLORS.length] }} />
                         <span className="text-white/70">{item.name}</span>
+                        <Badge variant="outline" className="text-[9px] h-4 px-1 border-white/20 text-white/50">
+                          {item.count} {item.count === 1 ? 'item' : 'itens'}
+                        </Badge>
                       </div>
                       <span className="font-bold">{formatCurrency(item.value)}</span>
                     </div>
                   ))}
+                  <div className="flex justify-between items-center pt-2 border-t border-white/10 mt-2">
+                    <span className="text-xs font-bold text-white/90">Total Geral</span>
+                    <span className="text-sm font-bold text-blue-300">{formatCurrency(reportData.totalExpenses)}</span>
+                  </div>
                 </div>
               </div>
 
@@ -1883,23 +1901,20 @@ export default function App() {
             
             <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
               {displayAdditionalSalaries.length > 0 ? (
-                <Reorder.Group 
-                  axis="y" 
-                  values={displayAdditionalSalaries} 
-                  onReorder={handleReorderAdditionalSalaries}
-                  className="space-y-3"
-                >
-                  {displayAdditionalSalaries.map(s => (
-                    <AdditionalSalaryItem
-                      key={s.id}
-                      salary={s}
-                      onEdit={(salary) => { setIsAdditionalSalaryListModalOpen(false); handleEditAdditionalSalary(salary); }}
-                      onDelete={handleDeleteAdditionalSalary}
-                      formatCurrency={formatCurrency}
-                      formatDate={formatDate}
-                    />
-                  ))}
-                </Reorder.Group>
+                <div className="space-y-3">
+                  <AnimatePresence mode="popLayout">
+                    {displayAdditionalSalaries.map(s => (
+                      <AdditionalSalaryItem
+                        key={s.id}
+                        salary={s}
+                        onEdit={(salary) => { setIsAdditionalSalaryListModalOpen(false); handleEditAdditionalSalary(salary); }}
+                        onDelete={handleDeleteAdditionalSalary}
+                        formatCurrency={formatCurrency}
+                        formatDate={formatDate}
+                      />
+                    ))}
+                  </AnimatePresence>
+                </div>
               ) : (
                 <div className="text-center py-8 text-white/30 italic">
                   Nenhum salário adicional registrado para este mês.
@@ -1974,6 +1989,65 @@ export default function App() {
               className="w-full bg-white text-[#144a95] hover:bg-white/90"
             >
               Adicionar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Share Modal */}
+      <Dialog open={isShareModalOpen} onOpenChange={setIsShareModalOpen}>
+        <DialogContent className="bg-[#144a95] border-white/20 text-white rounded-3xl max-w-[90vw] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-2xl">
+              <Share2 className="w-6 h-6 text-blue-400" />
+              Compartilhar App
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-6 space-y-6">
+            <div className="bg-white/5 p-6 rounded-2xl border border-white/10 space-y-4">
+              <p className="text-sm text-white/70 leading-relaxed">
+                Compartilhe o link abaixo para que outras pessoas possam gerenciar suas finanças de forma independente com login Google.
+              </p>
+              <div className="flex items-center gap-2 bg-black/20 p-3 rounded-xl border border-white/10">
+                <code className="flex-1 text-sm font-mono text-blue-300 truncate">
+                  limafinancas.netlify.app
+                </code>
+                <Button 
+                  size="sm" 
+                  variant="ghost" 
+                  onClick={copyToClipboard}
+                  className="h-8 px-3 bg-white/10 hover:bg-white/20 text-white gap-2"
+                >
+                  {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copied ? "Copiado" : "Copiar"}
+                </Button>
+              </div>
+            </div>
+            
+            <div className="space-y-3">
+              <h4 className="text-xs font-bold uppercase tracking-widest text-white/40">Como funciona?</h4>
+              <ul className="space-y-2 text-sm text-white/60">
+                <li className="flex items-start gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 shrink-0" />
+                  <span>Cada usuário tem seu próprio espaço seguro.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 shrink-0" />
+                  <span>Acesso via conta Google para máxima segurança.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 shrink-0" />
+                  <span>Dados salvos automaticamente na nuvem.</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              onClick={() => setIsShareModalOpen(false)}
+              className="w-full bg-white text-[#144a95] hover:bg-white/90 font-bold py-6 rounded-2xl"
+            >
+              Fechar
             </Button>
           </DialogFooter>
         </DialogContent>

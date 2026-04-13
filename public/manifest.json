@@ -4,18 +4,21 @@
   "description": "Controle seu salário e despesas mensais de forma simples e independente.",
   "start_url": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#144a95",
   "theme_color": "#144a95",
   "icons": [
     {
       "src": "https://picsum.photos/seed/finance/192/192",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
       "src": "https://picsum.photos/seed/finance/512/512",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }
