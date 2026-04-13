@@ -295,6 +295,7 @@ export default function App() {
   const [salaryTimeout, setSalaryTimeout] = useState<NodeJS.Timeout | null>(null);
 
   const [salary, setSalary] = useState<number>(0);
+  const [secondarySalary, setSecondarySalary] = useState<number>(0);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
   const [additionalSalaries, setAdditionalSalaries] = useState<AdditionalSalary[]>([]);
@@ -441,9 +442,18 @@ export default function App() {
       if (docSnap.exists()) {
         const data = docSnap.data();
         const cloudSalary = data.salary || 0;
+        const cloudSecondarySalary = data.secondarySalary || 0;
+        
         setSalary(prev => {
           if (prev !== cloudSalary && !isSavingSalary) {
             return cloudSalary;
+          }
+          return prev;
+        });
+
+        setSecondarySalary(prev => {
+          if (prev !== cloudSecondarySalary && !isSavingSalary) {
+            return cloudSecondarySalary;
           }
           return prev;
         });
@@ -534,15 +544,21 @@ export default function App() {
   };
 
   // Firestore Operations
-  const updateSalaryInCloud = async (newSalary: number) => {
+  const updateSalaryInCloud = async (newSalary: number, isSecondary: boolean = false) => {
     if (!user) return;
     setIsSavingSalary(true);
     const path = `users/${user.uid}/settings/main`;
     try {
-      await setDoc(doc(db, path), { 
-        salary: newSalary,
+      const updateData: any = {
         updatedAt: new Date().toISOString()
-      }, { merge: true });
+      };
+      if (isSecondary) {
+        updateData.secondarySalary = newSalary;
+      } else {
+        updateData.salary = newSalary;
+      }
+      
+      await setDoc(doc(db, path), updateData, { merge: true });
       setIsSavingSalary(false);
     } catch (error) {
       setIsSavingSalary(false);
@@ -550,15 +566,19 @@ export default function App() {
     }
   };
 
-  const handleSalaryChange = (val: number) => {
-    setSalary(val);
+  const handleSalaryChange = (val: number, isSecondary: boolean = false) => {
+    if (isSecondary) {
+      setSecondarySalary(val);
+    } else {
+      setSalary(val);
+    }
     
     if (salaryTimeout) {
       clearTimeout(salaryTimeout);
     }
 
     const timeout = setTimeout(() => {
-      updateSalaryInCloud(val);
+      updateSalaryInCloud(val, isSecondary);
     }, 1000);
     
     setSalaryTimeout(timeout);
@@ -963,7 +983,7 @@ export default function App() {
     return filteredAdditionalSalaries.reduce((acc, curr) => acc + curr.value, 0);
   }, [filteredAdditionalSalaries]);
 
-  const totalIncome = salary + totalAdditionalSalary;
+  const totalIncome = salary + secondarySalary + totalAdditionalSalary;
   const balance = totalIncome - totalMonthlyExpenses;
 
   const handleEditExpense = (expense: Expense) => {
@@ -1121,7 +1141,7 @@ export default function App() {
       monthlyData.push({
         name: mLabel,
         despesas: mExpenses,
-        rendimentos: salary + mAdditional,
+        rendimentos: salary + secondarySalary + mAdditional,
         extra: mAdditional
       });
 
@@ -1282,7 +1302,7 @@ export default function App() {
             {activeTab === "home" ? (
               <>
                 {/* Salary Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <motion.div 
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
@@ -1302,7 +1322,34 @@ export default function App() {
                         value={salary || ""}
                         onChange={(e) => {
                           const val = parseFloat(e.target.value) || 0;
-                          handleSalaryChange(val);
+                          handleSalaryChange(val, false);
+                        }}
+                        className="bg-transparent border-none text-2xl font-bold text-white focus-visible:ring-0 h-auto p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none w-full"
+                        placeholder="0,00"
+                      />
+                    </div>
+                  </motion.div>
+
+                  <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/20 shadow-xl flex flex-col min-h-[110px] justify-center"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <Label htmlFor="secondarySalary" className="text-white/70 text-[10px] uppercase font-bold block tracking-widest">Salário Adicional</Label>
+                      {isSavingSalary && (
+                        <div className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-white/50 text-lg font-bold shrink-0">R$</span>
+                      <Input
+                        id="secondarySalary"
+                        type="number"
+                        value={secondarySalary || ""}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value) || 0;
+                          handleSalaryChange(val, true);
                         }}
                         className="bg-transparent border-none text-2xl font-bold text-white focus-visible:ring-0 h-auto p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none w-full"
                         placeholder="0,00"

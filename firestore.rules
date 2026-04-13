@@ -90,6 +90,7 @@ service cloud.firestore {
     function isValidSettings(data) {
       return data.keys().hasAll(['salary']) &&
              isValidNumber(data.salary, 0) &&
+             (!('secondarySalary' in data) || isValidNumber(data.secondarySalary, 0)) &&
              (!('dashboardOrder' in data) || data.dashboardOrder is list);
     }
 
