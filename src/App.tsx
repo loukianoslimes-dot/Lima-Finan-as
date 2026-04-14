@@ -144,7 +144,7 @@ const DebtorItem: React.FC<DebtorItemProps> = ({
       layout
       className={cn(
         "group bg-white/5 hover:bg-white/10 transition-all p-4 rounded-2xl border border-white/5 flex items-center justify-between gap-4",
-        debtor.isReceived && "bg-blue-500/20 border-blue-500/40 shadow-[0_0_15px_rgba(59,130,246,0.1)]"
+        debtor.isReceived && "bg-green-500/20 border-green-500/40 shadow-[0_0_15px_rgba(34,197,94,0.1)]"
       )}
     >
       <div className="flex items-center gap-4 flex-1 min-w-0">
@@ -152,20 +152,20 @@ const DebtorItem: React.FC<DebtorItemProps> = ({
           <Checkbox 
             checked={!!debtor.isReceived}
             onCheckedChange={() => onToggleReceived(debtor)}
-            className="border-white/30 data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
+            className="border-white/30 data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
           />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <h3 className={cn("font-bold truncate", debtor.isReceived && "text-blue-100")}>
+            <h3 className={cn("font-bold truncate", debtor.isReceived && "text-green-100")}>
               {debtor.description}
             </h3>
-            {debtor.isReceived && <Badge className="bg-blue-500 text-[10px] h-4 px-1 text-white">Recebido</Badge>}
+            {debtor.isReceived && <Badge className="bg-green-500 text-[10px] h-4 px-1 text-white">Recebido</Badge>}
           </div>
           <div className="flex items-center gap-2 text-xs text-white/60">
             <span>{formatDate(debtor.date)}</span>
           </div>
-          {debtor.notes && <p className={cn("text-xs text-white/40 mt-1 italic", debtor.isReceived && "text-blue-200/40")}>{debtor.notes}</p>}
+          {debtor.notes && <p className={cn("text-xs text-white/40 mt-1 italic", debtor.isReceived && "text-green-200/40")}>{debtor.notes}</p>}
         </div>
       </div>
 
@@ -180,7 +180,7 @@ const DebtorItem: React.FC<DebtorItemProps> = ({
       
       <div className="flex items-center gap-4 ml-auto" onPointerDown={(e) => e.stopPropagation()}>
         <div className="text-right shrink-0">
-          <div className={cn("font-bold flex items-baseline gap-1", debtor.isReceived ? "text-blue-300" : "text-white")}>
+          <div className={cn("font-bold flex items-baseline gap-1", debtor.isReceived ? "text-green-300" : "text-white")}>
             <span className="text-[10px] opacity-50">{symbol}</span>
             <span className="text-lg whitespace-nowrap">{amount}</span>
           </div>
