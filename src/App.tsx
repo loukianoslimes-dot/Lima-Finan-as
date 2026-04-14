@@ -449,7 +449,7 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Update PWA icons and manifest dynamically
+  // Update PWA icons dynamically and cache for Service Worker
   useEffect(() => {
     // Priority: User profile picture > Admin custom icon > Default icon
     const iconUrl = userPhotoUrl || systemConfig.appIconUrl || "https://picsum.photos/seed/finance/192/192";
@@ -467,40 +467,21 @@ export default function App() {
     updateLink('icon', iconUrl);
     updateLink('apple-touch-icon', iconUrl);
 
-    // Dynamic Manifest to ensure the icon is used during installation
-    const manifest = {
-      name: "Lima Finanças",
-      short_name: "LimaFin",
-      description: "Controle seu salário e despesas mensais de forma simples e independente.",
-      start_url: "/",
-      display: "standalone",
-      orientation: "portrait",
-      background_color: "#144a95",
-      theme_color: "#144a95",
-      icons: [
-        {
-          src: iconUrl,
-          sizes: "192x192",
-          type: "image/png",
-          purpose: "any maskable"
-        },
-        {
-          src: iconUrl,
-          sizes: "512x512",
-          type: "image/png",
-          purpose: "any maskable"
+    // Save icon to cache for Service Worker to use in the manifest
+    if (iconUrl && 'caches' in window) {
+      const updateIconCache = async () => {
+        try {
+          const cache = await caches.open('dynamic-icons');
+          const response = await fetch(iconUrl);
+          if (response.ok) {
+            await cache.put('user-profile-pic', response);
+          }
+        } catch (error) {
+          console.error("Error updating icon cache:", error);
         }
-      ]
-    };
-
-    const stringManifest = JSON.stringify(manifest);
-    const blob = new Blob([stringManifest], {type: 'application/json'});
-    const manifestURL = URL.createObjectURL(blob);
-    updateLink('manifest', manifestURL);
-
-    return () => {
-      URL.revokeObjectURL(manifestURL);
-    };
+      };
+      updateIconCache();
+    }
   }, [userPhotoUrl, systemConfig.appIconUrl]);
 
   const handleProfilePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
