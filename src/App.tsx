@@ -16,7 +16,8 @@ import {
 } from 'recharts';
 import { 
   onAuthStateChanged, 
-  User 
+  User,
+  updateProfile
 } from "firebase/auth";
 import { 
   collection, 
@@ -432,6 +433,8 @@ export default function App() {
   const [editingAdditionalSalary, setEditingAdditionalSalary] = useState<AdditionalSalary | null>(null);
   const [newCategory, setNewCategory] = useState("");
 
+  const [userPhotoUrl, setUserPhotoUrl] = useState<string | null>(null);
+
   const [systemConfig, setSystemConfig] = useState<{ appIconUrl?: string }>({});
   const isAdmin = user?.email === "loukianoslimes@gmail.com";
 
@@ -446,35 +449,94 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Update PWA icons dynamically
+  // Update PWA icons and manifest dynamically
   useEffect(() => {
-    if (systemConfig.appIconUrl) {
-      const updateLink = (rel: string, href: string) => {
-        let link = document.querySelector(`link[rel="${rel}"]`) as HTMLLinkElement;
-        if (!link) {
-          link = document.createElement('link');
-          link.rel = rel;
-          document.head.appendChild(link);
+    // Priority: User profile picture > Admin custom icon > Default icon
+    const iconUrl = userPhotoUrl || systemConfig.appIconUrl || "https://picsum.photos/seed/finance/192/192";
+    
+    const updateLink = (rel: string, href: string) => {
+      let link = document.querySelector(`link[rel="${rel}"]`) as HTMLLinkElement;
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = rel;
+        document.head.appendChild(link);
+      }
+      link.href = href;
+    };
+
+    updateLink('icon', iconUrl);
+    updateLink('apple-touch-icon', iconUrl);
+
+    // Dynamic Manifest to ensure the icon is used during installation
+    const manifest = {
+      name: "Lima Finanças",
+      short_name: "LimaFin",
+      description: "Controle seu salário e despesas mensais de forma simples e independente.",
+      start_url: "/",
+      display: "standalone",
+      orientation: "portrait",
+      background_color: "#144a95",
+      theme_color: "#144a95",
+      icons: [
+        {
+          src: iconUrl,
+          sizes: "192x192",
+          type: "image/png",
+          purpose: "any maskable"
+        },
+        {
+          src: iconUrl,
+          sizes: "512x512",
+          type: "image/png",
+          purpose: "any maskable"
         }
-        link.href = href;
-      };
+      ]
+    };
 
-      updateLink('icon', systemConfig.appIconUrl);
-      updateLink('apple-touch-icon', systemConfig.appIconUrl);
-    }
-  }, [systemConfig.appIconUrl]);
+    const stringManifest = JSON.stringify(manifest);
+    const blob = new Blob([stringManifest], {type: 'application/json'});
+    const manifestURL = URL.createObjectURL(blob);
+    updateLink('manifest', manifestURL);
 
-  const handleIconUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    return () => {
+      URL.revokeObjectURL(manifestURL);
+    };
+  }, [userPhotoUrl, systemConfig.appIconUrl]);
+
+  const handleProfilePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !isAdmin) return;
+    if (!file || !user) return;
+
+    // Firestore document limit is 1MB. We'll limit to 800KB to be safe with other fields.
+    if (file.size > 800000) {
+      alert("A imagem é muito grande. Por favor, escolha uma imagem menor que 800KB.");
+      return;
+    }
 
     const reader = new FileReader();
     reader.onloadend = async () => {
       const base64String = reader.result as string;
       try {
-        await setDoc(doc(db, "system/config"), { appIconUrl: base64String }, { merge: true });
+        // Update Firestore settings (primary storage for photo)
+        const settingsPath = `users/${user.uid}/settings/main`;
+        await setDoc(doc(db, settingsPath), { photoURL: base64String }, { merge: true });
+        
+        // Update state immediately for better UX
+        setUserPhotoUrl(base64String);
+
+        // Try to update Firebase Auth profile (might fail if too large, but we have Firestore)
+        try {
+          await updateProfile(user, { photoURL: base64String });
+        } catch (authError) {
+          console.warn("Auth profile update failed (likely size limit), using Firestore instead.");
+        }
+
+        // If admin, also update system icon for new users/unlogged users
+        if (isAdmin) {
+          await setDoc(doc(db, "system/config"), { appIconUrl: base64String }, { merge: true });
+        }
       } catch (error) {
-        console.error("Error uploading icon:", error);
+        console.error("Error updating profile photo:", error);
       }
     };
     reader.readAsDataURL(file);
@@ -546,6 +608,12 @@ export default function App() {
         const cloudSalary = data.salary || 0;
         const cloudSecondarySalary = data.secondarySalary || 0;
         
+        if (data.photoURL) {
+          setUserPhotoUrl(data.photoURL);
+        } else if (user.photoURL) {
+          setUserPhotoUrl(user.photoURL);
+        }
+
         setSalary(prev => {
           if (prev !== cloudSalary && !isSavingSalary) {
             return cloudSalary;
@@ -699,8 +767,10 @@ export default function App() {
     setSalaryTimeout(timeout);
   };
 
+  const APP_URL = "https://limafinancas.netlify.app";
+
   const copyToClipboard = () => {
-    navigator.clipboard.writeText(window.location.origin);
+    navigator.clipboard.writeText(APP_URL);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -1643,9 +1713,9 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
               <div className="flex items-center gap-3">
                 <div className="relative group">
                   <div className="bg-white/20 p-1 rounded-xl backdrop-blur-md overflow-hidden min-w-[48px] min-h-[48px] max-w-[120px] max-h-[120px] flex items-center justify-center border border-white/20 w-fit h-fit">
-                    {systemConfig.appIconUrl ? (
+                    {userPhotoUrl || systemConfig.appIconUrl ? (
                       <img 
-                        src={systemConfig.appIconUrl} 
+                        src={userPhotoUrl || systemConfig.appIconUrl} 
                         alt="Profile" 
                         className="max-w-full max-h-full object-contain rounded-lg"
                         referrerPolicy="no-referrer"
@@ -1654,10 +1724,10 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
                       <UserIcon className="w-6 h-6 text-white/50" />
                     )}
                   </div>
-                  {isAdmin && (
+                  {user && (
                     <label className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded-xl">
                       <Camera className="w-5 h-5 text-white" />
-                      <input type="file" className="hidden" accept="image/*" onChange={handleIconUpload} />
+                      <input type="file" className="hidden" accept="image/*" onChange={handleProfilePhotoUpload} />
                     </label>
                   )}
                 </div>
@@ -3122,7 +3192,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
                 </p>
                 <div className="flex flex-col gap-2 bg-black/20 p-3 rounded-xl border border-white/10">
                   <code className="text-xs font-mono text-blue-300 break-all py-1">
-                    {window.location.origin}
+                    https://limafinancas.netlify.app
                   </code>
                   <Button 
                     size="sm" 
