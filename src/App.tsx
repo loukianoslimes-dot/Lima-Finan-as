@@ -31,6 +31,7 @@ import {
   getDocFromServer
 } from "firebase/firestore";
 import { auth, db, signInWithGoogle, logout, handleFirestoreError, OperationType, sanitizeData } from "./firebase";
+import { formatCurrencyParts, generateId, addMonths, addYears, formatDateToISO } from "./utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -65,6 +66,7 @@ interface Expense {
   repeatFrequency?: "monthly" | "yearly";
   notes: string;
   date: string; // ISO string
+  dueDate?: string; // ISO string
   parentId?: string; // To group recurring expenses
   isPaid?: boolean;
   paidMonths?: string[]; // For fixed expenses: ["YYYY-MM", ...]
@@ -80,6 +82,23 @@ interface AdditionalSalary {
   order?: number;
 }
 
+interface Debtor {
+  id: string;
+  value: number;
+  description: string;
+  isFixed: boolean;
+  isRecurring: boolean;
+  repeatCount?: number;
+  repeatFrequency?: "monthly" | "yearly";
+  notes: string;
+  date: string; // ISO string
+  parentId?: string;
+  isReceived?: boolean;
+  receivedMonths?: string[];
+  order?: number;
+  installmentIndex?: number;
+}
+
 const DEFAULT_CATEGORIES = [
   "Assinaturas",
   "Casa",
@@ -93,6 +112,101 @@ const DEFAULT_CATEGORIES = [
 ];
 
 // Main App Component
+interface DebtorItemProps {
+  debtor: Debtor;
+  currentMonthStr: string;
+  onToggleReceived: (debtor: Debtor) => void | Promise<void>;
+  onEdit: (debtor: Debtor) => void;
+  onDelete: (id: string) => void;
+  formatCurrency: (val: number) => string;
+  formatDate: (dateStr: string) => string;
+  installmentInfo?: string;
+}
+
+const DebtorItem: React.FC<DebtorItemProps> = ({ 
+  debtor, 
+  currentMonthStr, 
+  onToggleReceived, 
+  onEdit, 
+  onDelete, 
+  formatCurrency, 
+  formatDate,
+  installmentInfo
+}) => {
+  const { symbol, amount } = formatCurrencyParts(debtor.value);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: -20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 20 }}
+      layout
+      className={cn(
+        "group bg-white/5 hover:bg-white/10 transition-all p-4 rounded-2xl border border-white/5 flex items-center justify-between gap-4",
+        debtor.isReceived && "bg-blue-500/20 border-blue-500/40 shadow-[0_0_15px_rgba(59,130,246,0.1)]"
+      )}
+    >
+      <div className="flex items-center gap-4 flex-1 min-w-0">
+        <div onPointerDown={(e) => e.stopPropagation()}>
+          <Checkbox 
+            checked={!!debtor.isReceived}
+            onCheckedChange={() => onToggleReceived(debtor)}
+            className="border-white/30 data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
+          />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <h3 className={cn("font-bold truncate", debtor.isReceived && "text-blue-100")}>
+              {debtor.description}
+            </h3>
+            {debtor.isReceived && <Badge className="bg-blue-500 text-[10px] h-4 px-1 text-white">Recebido</Badge>}
+          </div>
+          <div className="flex items-center gap-2 text-xs text-white/60">
+            <span>{formatDate(debtor.date)}</span>
+          </div>
+          {debtor.notes && <p className={cn("text-xs text-white/40 mt-1 italic", debtor.isReceived && "text-blue-200/40")}>{debtor.notes}</p>}
+        </div>
+      </div>
+
+      <div className="flex flex-col items-center gap-1 shrink-0 px-2 min-w-[70px]">
+        {debtor.isFixed && <Badge className="bg-blue-500/50 text-[10px] h-4 px-1">Fixa</Badge>}
+        {debtor.isRecurring && (
+          <Badge className="bg-purple-500/50 text-[10px] h-4 px-1 text-center">
+            Recorrente {installmentInfo && <span className="block text-[8px] opacity-80">({installmentInfo})</span>}
+          </Badge>
+        )}
+      </div>
+      
+      <div className="flex items-center gap-4 ml-auto" onPointerDown={(e) => e.stopPropagation()}>
+        <div className="text-right shrink-0">
+          <div className={cn("font-bold flex items-baseline gap-1", debtor.isReceived ? "text-blue-300" : "text-white")}>
+            <span className="text-[10px] opacity-50">{symbol}</span>
+            <span className="text-lg whitespace-nowrap">{amount}</span>
+          </div>
+        </div>
+        <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-7 w-7 text-white/70 hover:text-white hover:bg-white/10"
+            onClick={() => onEdit(debtor)}
+          >
+            <Edit2 className="w-3.5 h-3.5" />
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-7 w-7 text-red-400 hover:text-red-300 hover:bg-red-500/10"
+            onClick={() => onDelete(debtor.id)}
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
 interface ExpenseItemProps {
   expense: Expense;
   currentMonthStr: string;
@@ -114,21 +228,6 @@ const ExpenseItem: React.FC<ExpenseItemProps> = ({
   formatDate,
   installmentInfo
 }) => {
-  // Helper to split currency for better layout control
-  const formatCurrencyParts = (value: number) => {
-    try {
-      const parts = new Intl.NumberFormat("pt-BR", {
-        style: "currency",
-        currency: "BRL",
-      }).formatToParts(value);
-      const symbol = parts.find(p => p.type === 'currency')?.value || "R$";
-      const amount = parts.filter(p => p.type !== 'currency').map(p => p.value).join('').trim();
-      return { symbol, amount };
-    } catch (e) {
-      return { symbol: "R$", amount: value.toFixed(2).replace('.', ',') };
-    }
-  };
-
   const { symbol, amount } = formatCurrencyParts(expense.value);
 
   return (
@@ -145,7 +244,7 @@ const ExpenseItem: React.FC<ExpenseItemProps> = ({
       <div className="flex items-center gap-4 flex-1 min-w-0">
         <div onPointerDown={(e) => e.stopPropagation()}>
           <Checkbox 
-            checked={expense.isPaid}
+            checked={!!expense.isPaid}
             onCheckedChange={() => onTogglePaid(expense)}
             className="border-white/30 data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
           />
@@ -161,6 +260,12 @@ const ExpenseItem: React.FC<ExpenseItemProps> = ({
             <span className={cn("bg-white/10 px-2 py-0.5 rounded-full", expense.isPaid && "bg-green-500/20 text-green-200")}>{expense.category}</span>
             <span>•</span>
             <span>{formatDate(expense.date)}</span>
+            {expense.dueDate && (
+              <>
+                <span>•</span>
+                <span className="text-yellow-400/80">Venc: {formatDate(expense.dueDate)}</span>
+              </>
+            )}
           </div>
           {expense.notes && <p className={cn("text-xs text-white/40 mt-1 italic", expense.isPaid && "text-green-200/40")}>{expense.notes}</p>}
         </div>
@@ -221,21 +326,6 @@ const AdditionalSalaryItem: React.FC<AdditionalSalaryItemProps> = ({
   formatCurrency, 
   formatDate 
 }) => {
-  // Helper to split currency for better layout control
-  const formatCurrencyParts = (value: number) => {
-    try {
-      const parts = new Intl.NumberFormat("pt-BR", {
-        style: "currency",
-        currency: "BRL",
-      }).formatToParts(value);
-      const symbol = parts.find(p => p.type === 'currency')?.value || "R$";
-      const amount = parts.filter(p => p.type !== 'currency').map(p => p.value).join('').trim();
-      return { symbol, amount };
-    } catch (e) {
-      return { symbol: "R$", amount: value.toFixed(2).replace('.', ',') };
-    }
-  };
-
   const { symbol, amount } = formatCurrencyParts(salary.value);
 
   return (
@@ -297,13 +387,14 @@ export default function App() {
   const [salary, setSalary] = useState<number>(0);
   const [secondarySalary, setSecondarySalary] = useState<number>(0);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [debtors, setDebtors] = useState<Debtor[]>([]);
   const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
   const [additionalSalaries, setAdditionalSalaries] = useState<AdditionalSalary[]>([]);
   const [displayExpenses, setDisplayExpenses] = useState<Expense[]>([]);
   const [displayAdditionalSalaries, setDisplayAdditionalSalaries] = useState<AdditionalSalary[]>([]);
 
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [activeTab, setActiveTab] = useState<"home" | "report">("home");
+  const [activeTab, setActiveTab] = useState<"home" | "report" | "debtors">("home");
   const [reportRange, setReportRange] = useState<{ start: string, end: string }>(() => {
     const now = new Date();
     const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
@@ -313,6 +404,8 @@ export default function App() {
     };
   });
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isDebtorModalOpen, setIsDebtorModalOpen] = useState(false);
+  const [isSalaryModalOpen, setIsSalaryModalOpen] = useState(false);
   const [isAdditionalSalaryModalOpen, setIsAdditionalSalaryModalOpen] = useState(false);
   const [isAdditionalSalaryListModalOpen, setIsAdditionalSalaryListModalOpen] = useState(false);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
@@ -320,13 +413,22 @@ export default function App() {
   const [isDeleteConfirmModalOpen, setIsDeleteConfirmModalOpen] = useState(false);
   const [isDeleteAdditionalSalaryConfirmModalOpen, setIsDeleteAdditionalSalaryConfirmModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isBillingModalOpen, setIsBillingModalOpen] = useState(false);
+  const [selectedDebtorForBilling, setSelectedDebtorForBilling] = useState<Debtor | null>(null);
+  const [billingMessage, setBillingMessage] = useState("");
+  const [billingCopied, setBillingCopied] = useState(false);
+  const [pixKey, setPixKey] = useState(() => localStorage.getItem('user-pix-key') || "");
+  const [isEditingPix, setIsEditingPix] = useState(false);
+  const [pixCopied, setPixCopied] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallButton, setShowInstallButton] = useState(false);
   const [copied, setCopied] = useState(false);
   const [expenseToDelete, setExpenseToDelete] = useState<string | null>(null);
+  const [debtorToDelete, setDebtorToDelete] = useState<string | null>(null);
   const [additionalSalaryToDelete, setAdditionalSalaryToDelete] = useState<string | null>(null);
   const [recurringActionType, setRecurringActionType] = useState<"edit" | "delete" | null>(null);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [editingDebtor, setEditingDebtor] = useState<Debtor | null>(null);
   const [editingAdditionalSalary, setEditingAdditionalSalary] = useState<AdditionalSalary | null>(null);
   const [newCategory, setNewCategory] = useState("");
 
@@ -485,10 +587,23 @@ export default function App() {
       setIsSyncing(snapshot.metadata.hasPendingWrites || snapshot.metadata.fromCache);
     }, (error) => handleFirestoreError(error, OperationType.GET, additionalPath));
 
+    // Listen to Debtors
+    const debtorsPath = `users/${user.uid}/debtors`;
+    const debtorsQuery = query(collection(db, debtorsPath));
+    const debtorsUnsubscribe = onSnapshot(debtorsQuery, (snapshot) => {
+      const items: Debtor[] = [];
+      snapshot.forEach((doc) => {
+        items.push({ id: doc.id, ...doc.data() } as Debtor);
+      });
+      setDebtors(items);
+      setIsSyncing(snapshot.metadata.hasPendingWrites || snapshot.metadata.fromCache);
+    }, (error) => handleFirestoreError(error, OperationType.GET, debtorsPath));
+
     return () => {
       settingsUnsubscribe();
       expensesUnsubscribe();
       additionalUnsubscribe();
+      debtorsUnsubscribe();
     };
   }, [user]);
 
@@ -590,8 +705,66 @@ export default function App() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const copyBillingToClipboard = () => {
+    if (!billingMessage) return;
+    navigator.clipboard.writeText(billingMessage);
+    setBillingCopied(true);
+    setTimeout(() => setBillingCopied(false), 2000);
+  };
+
+  const savePixKey = (key: string) => {
+    setPixKey(key);
+    localStorage.setItem('user-pix-key', key);
+  };
+
+  const copyPixToClipboard = () => {
+    if (!pixKey) return;
+    navigator.clipboard.writeText(pixKey);
+    setPixCopied(true);
+    setTimeout(() => setPixCopied(false), 2000);
+  };
+
+  const generateBillingMessage = (debtor: Debtor) => {
+    const formattedValue = new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    }).format(debtor.value);
+    
+    const formattedDate = formatDate(debtor.date);
+    
+    let message = `Olá!
+Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${debtor.description}, com vencimento em ${formattedDate}.`;
+
+    if (pixKey) {
+      message += `\n\nO valor pode ser depositado no PIX: ${pixKey}`;
+    }
+
+    message += `\n\nFico no aguardo do pagamento. Obrigado!`;
+    
+    setBillingMessage(message);
+    setSelectedDebtorForBilling(debtor);
+  };
+
+  const shareBillingMessage = async () => {
+    if (!billingMessage) return;
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          text: billingMessage,
+        });
+      } catch (err) {
+        console.error("Error sharing:", err);
+        // Fallback to WhatsApp if share fails
+        window.open(`https://wa.me/?text=${encodeURIComponent(billingMessage)}`, '_blank');
+      }
+    } else {
+      window.open(`https://wa.me/?text=${encodeURIComponent(billingMessage)}`, '_blank');
+    }
+  };
+
   const handleAddExpense = async () => {
-    if (!user) return;
+    if (!user || isSaving) return;
     
     // Basic validation
     if (!formData.description.trim()) {
@@ -605,7 +778,6 @@ export default function App() {
 
     setValidationError(null);
     setIsSaving(true);
-    console.log("Starting to save expense:", formData);
     
     const expenseData = {
       ...formData,
@@ -618,12 +790,11 @@ export default function App() {
 
     try {
       if (editingExpense) {
-        console.log("Editing existing expense:", editingExpense.id);
         if (editingExpense.isFixed || editingExpense.parentId || editingExpense.isRecurring) {
           setRecurringActionType("edit");
           setIsRecurringActionModalOpen(true);
           setIsSaving(false);
-          return; // Stop here, the recurring modal will handle the rest
+          return;
         } else {
           const path = `${basePath}/${editingExpense.id}`;
           await setDoc(doc(db, path), sanitizeData({
@@ -632,31 +803,40 @@ export default function App() {
           }));
         }
       } else {
-        console.log("Adding new expense");
         if (formData.isRecurring && formData.repeatCount > 1) {
-          console.log("Creating recurring expenses:", formData.repeatCount);
-          const parentId = crypto.randomUUID();
+          const parentId = generateId();
           const [y, m, d] = formData.date.split('-').map(Number);
           const baseDate = new Date(y, m - 1, d);
+          
+          let baseDueDate: Date | null = null;
+          if (formData.dueDate) {
+            const [dy, dm, dd] = formData.dueDate.split('-').map(Number);
+            baseDueDate = new Date(dy, dm - 1, dd);
+          }
 
           const batch = writeBatch(db);
           for (let i = 0; i < formData.repeatCount; i++) {
-            const nextDate = new Date(baseDate);
+            let nextDate: Date;
+            let nextDueDateStr = "";
+
             if (formData.repeatFrequency === "monthly") {
-              nextDate.setMonth(baseDate.getMonth() + i);
+              nextDate = addMonths(baseDate, i);
+              if (baseDueDate) {
+                nextDueDateStr = formatDateToISO(addMonths(baseDueDate, i));
+              }
             } else {
-              nextDate.setFullYear(baseDate.getFullYear() + i);
+              nextDate = addYears(baseDate, i);
+              if (baseDueDate) {
+                nextDueDateStr = formatDateToISO(addYears(baseDueDate, i));
+              }
             }
 
-            const ny = nextDate.getFullYear();
-            const nm = String(nextDate.getMonth() + 1).padStart(2, '0');
-            const nd = String(nextDate.getDate()).padStart(2, '0');
-
-            const id = crypto.randomUUID();
+            const id = generateId();
             const path = `${basePath}/${id}`;
             batch.set(doc(db, path), sanitizeData({
               ...expenseData,
-              date: `${ny}-${nm}-${nd}`,
+              date: formatDateToISO(nextDate),
+              dueDate: nextDueDateStr || expenseData.dueDate,
               parentId: parentId,
               installmentIndex: i + 1,
               order: nextOrder,
@@ -664,7 +844,7 @@ export default function App() {
           }
           await batch.commit();
         } else {
-          const id = crypto.randomUUID();
+          const id = generateId();
           const path = `${basePath}/${id}`;
           await setDoc(doc(db, path), sanitizeData({
             ...expenseData,
@@ -672,11 +852,9 @@ export default function App() {
           }));
         }
       }
-      console.log("Expense saved successfully");
       setIsAddModalOpen(false);
       resetForm();
     } catch (error) {
-      console.error("Error saving expense:", error);
       handleFirestoreError(error, OperationType.WRITE, basePath);
     } finally {
       setIsSaving(false);
@@ -892,6 +1070,7 @@ export default function App() {
     repeatFrequency: "monthly" | "yearly";
     notes: string;
     date: string;
+    dueDate: string;
   }>(() => {
     const now = new Date();
     const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -905,8 +1084,49 @@ export default function App() {
       repeatFrequency: "monthly",
       notes: "",
       date: today,
+      dueDate: "",
     };
   });
+
+  const [debtorFormData, setDebtorFormData] = useState<{
+    value: number;
+    description: string;
+    isFixed: boolean;
+    isRecurring: boolean;
+    repeatCount: number;
+    repeatFrequency: "monthly" | "yearly";
+    notes: string;
+    date: string;
+  }>(() => {
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    return {
+      value: 0,
+      description: "",
+      isFixed: false,
+      isRecurring: false,
+      repeatCount: 1,
+      repeatFrequency: "monthly",
+      notes: "",
+      date: today,
+    };
+  });
+
+  const adjustDateToMonth = (dateStr: string, targetMonthStr: string) => {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const [targetY, targetM] = targetMonthStr.split('-').map(Number);
+    
+    // Create a date object for the target month and year, but with the original day
+    const date = new Date(targetY, targetM - 1, d);
+    
+    // If the day overflowed (e.g., April 31st becomes May 1st), 
+    // set it to the last day of the target month
+    if (date.getMonth() !== targetM - 1) {
+      return new Date(targetY, targetM, 0).toISOString().slice(0, 10);
+    }
+    
+    return date.toISOString().slice(0, 10);
+  };
 
   const { fixedExpenses, variableExpenses } = useMemo(() => {
     const year = currentDate.getFullYear();
@@ -920,9 +1140,13 @@ export default function App() {
 
       if (expense.isFixed) {
         if (expenseMonthStr <= currentMonthStr) {
+          const adjustedDate = adjustDateToMonth(expense.date, currentMonthStr);
+          const adjustedDueDate = expense.dueDate ? adjustDateToMonth(expense.dueDate, currentMonthStr) : undefined;
+          
           fixed.push({
             ...expense,
-            date: `${currentMonthStr}-${expense.date.slice(8, 10)}`,
+            date: adjustedDate,
+            dueDate: adjustedDueDate,
             isPaid: expense.paidMonths?.includes(currentMonthStr) || false
           });
         }
@@ -943,6 +1167,39 @@ export default function App() {
   }, [expenses, currentDate]);
 
   const filteredExpenses = useMemo(() => [...fixedExpenses, ...variableExpenses], [fixedExpenses, variableExpenses]);
+
+  const { fixedDebtors, variableDebtors } = useMemo(() => {
+    const year = currentDate.getFullYear();
+    const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+    const currentMonthStr = `${year}-${month}`;
+    const fixed: Debtor[] = [];
+    const variable: Debtor[] = [];
+
+    debtors.forEach(debtor => {
+      const debtorMonthStr = debtor.date.slice(0, 7);
+
+      if (debtor.isFixed) {
+        if (debtorMonthStr <= currentMonthStr) {
+          fixed.push({
+            ...debtor,
+            date: `${currentMonthStr}-${debtor.date.slice(8, 10)}`,
+            isReceived: debtor.receivedMonths?.includes(currentMonthStr) || false
+          });
+        }
+      } else {
+        if (debtorMonthStr === currentMonthStr) {
+          variable.push(debtor);
+        }
+      }
+    });
+
+    fixed.sort((a, b) => a.description.localeCompare(b.description));
+    variable.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    return { fixedDebtors: fixed, variableDebtors: variable };
+  }, [debtors, currentDate]);
+
+  const filteredDebtors = useMemo(() => [...fixedDebtors, ...variableDebtors], [fixedDebtors, variableDebtors]);
 
   const filteredAdditionalSalaries = useMemo(() => {
     const year = currentDate.getFullYear();
@@ -975,8 +1232,11 @@ export default function App() {
     setDisplayAdditionalSalaries(sortedAll);
   }, [additionalSalaries]);
 
-  const totalMonthlyExpenses = useMemo(() => {
-    return filteredExpenses.reduce((acc, curr) => acc + curr.value, 0);
+  const { totalMonthlyExpenses, totalPaidExpenses, totalRemainingExpenses } = useMemo(() => {
+    const total = filteredExpenses.reduce((acc, curr) => acc + curr.value, 0);
+    const paid = filteredExpenses.filter(e => e.isPaid).reduce((acc, curr) => acc + curr.value, 0);
+    const remaining = total - paid;
+    return { totalMonthlyExpenses: total, totalPaidExpenses: paid, totalRemainingExpenses: remaining };
   }, [filteredExpenses]);
 
   const totalAdditionalSalary = useMemo(() => {
@@ -986,18 +1246,165 @@ export default function App() {
   const totalIncome = salary + secondarySalary + totalAdditionalSalary;
   const balance = totalIncome - totalMonthlyExpenses;
 
+  const totalDebtors = useMemo(() => {
+    return filteredDebtors.reduce((acc, curr) => acc + curr.value, 0);
+  }, [filteredDebtors]);
+
+  const totalReceivedDebtors = useMemo(() => {
+    return filteredDebtors.filter(d => d.isReceived).reduce((acc, curr) => acc + curr.value, 0);
+  }, [filteredDebtors]);
+
+  const resetDebtorForm = () => {
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    setDebtorFormData({
+      value: 0,
+      description: "",
+      isFixed: false,
+      isRecurring: false,
+      repeatCount: 1,
+      repeatFrequency: "monthly",
+      notes: "",
+      date: today,
+    });
+    setEditingDebtor(null);
+    setValidationError(null);
+  };
+
+  const handleAddDebtor = async () => {
+    if (!user || isSaving) return;
+    
+    if (!debtorFormData.description.trim()) {
+      setValidationError("O nome do devedor é obrigatório.");
+      return;
+    }
+    if (debtorFormData.value <= 0) {
+      setValidationError("O valor deve ser maior que zero.");
+      return;
+    }
+
+    setValidationError(null);
+    setIsSaving(true);
+    
+    const debtorData = {
+      ...debtorFormData,
+      uid: user.uid,
+    };
+
+    const basePath = `users/${user.uid}/debtors`;
+
+    try {
+      if (editingDebtor) {
+        const path = `${basePath}/${editingDebtor.id}`;
+        await setDoc(doc(db, path), sanitizeData(debtorData));
+      } else {
+        if (debtorFormData.isRecurring && debtorFormData.repeatCount > 1) {
+          const parentId = generateId();
+          const [y, m, d] = debtorFormData.date.split('-').map(Number);
+          const baseDate = new Date(y, m - 1, d);
+
+          const batch = writeBatch(db);
+          for (let i = 0; i < debtorFormData.repeatCount; i++) {
+            let nextDate: Date;
+            if (debtorFormData.repeatFrequency === "monthly") {
+              nextDate = addMonths(baseDate, i);
+            } else {
+              nextDate = addYears(baseDate, i);
+            }
+
+            const id = generateId();
+            const path = `${basePath}/${id}`;
+            batch.set(doc(db, path), sanitizeData({
+              ...debtorData,
+              date: formatDateToISO(nextDate),
+              parentId: parentId,
+              installmentIndex: i + 1,
+            }));
+          }
+          await batch.commit();
+        } else {
+          const id = generateId();
+          const path = `${basePath}/${id}`;
+          await setDoc(doc(db, path), sanitizeData(debtorData));
+        }
+      }
+      setIsDebtorModalOpen(false);
+      resetDebtorForm();
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, basePath);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleEditDebtor = (debtor: Debtor) => {
+    setEditingDebtor(debtor);
+    setDebtorFormData({
+      value: debtor.value,
+      description: debtor.description,
+      isFixed: !!debtor.isFixed,
+      isRecurring: !!debtor.isRecurring,
+      repeatCount: debtor.repeatCount || 1,
+      repeatFrequency: debtor.repeatFrequency || "monthly",
+      notes: debtor.notes || "",
+      date: toISODate(debtor.date),
+    });
+    setIsDebtorModalOpen(true);
+  };
+
+  const handleDeleteDebtor = (id: string) => {
+    setDebtorToDelete(id);
+    setIsDeleteConfirmModalOpen(true);
+  };
+
+  const confirmDeleteDebtor = async () => {
+    if (debtorToDelete && user) {
+      const path = `users/${user.uid}/debtors/${debtorToDelete}`;
+      try {
+        await deleteDoc(doc(db, path));
+        setDebtorToDelete(null);
+        setIsDeleteConfirmModalOpen(false);
+      } catch (error) {
+        handleFirestoreError(error, OperationType.DELETE, path);
+      }
+    }
+  };
+
+  const handleToggleDebtorReceived = async (debtor: Debtor) => {
+    if (!user) return;
+    const currentMonthStr = currentDate.toISOString().slice(0, 7);
+    const path = `users/${user.uid}/debtors/${debtor.id}`;
+    
+    try {
+      const debtorRef = doc(db, path);
+      if (debtor.isFixed) {
+        const receivedMonths = debtor.receivedMonths || [];
+        const isReceived = receivedMonths.includes(currentMonthStr);
+        const newReceivedMonths = isReceived 
+          ? receivedMonths.filter(m => m !== currentMonthStr)
+          : [...receivedMonths, currentMonthStr];
+        await updateDoc(debtorRef, { receivedMonths: newReceivedMonths });
+      } else {
+        await updateDoc(debtorRef, { isReceived: !debtor.isReceived });
+      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, path);
+    }
+  };
+
   const handleEditExpense = (expense: Expense) => {
     setEditingExpense(expense);
     setFormData({
       value: expense.value,
       description: expense.description,
       category: expense.category,
-      isFixed: expense.isFixed,
-      isRecurring: expense.isRecurring,
+      isFixed: !!expense.isFixed,
+      isRecurring: !!expense.isRecurring,
       repeatCount: expense.repeatCount || 1,
       repeatFrequency: expense.repeatFrequency || "monthly",
-      notes: expense.notes,
+      notes: expense.notes || "",
       date: toISODate(expense.date),
+      dueDate: expense.dueDate ? toISODate(expense.dueDate) : "",
     });
     setIsAddModalOpen(true);
   };
@@ -1062,6 +1469,7 @@ export default function App() {
       repeatFrequency: "monthly",
       notes: "",
       date: today,
+      dueDate: "",
     });
     setEditingExpense(null);
     setValidationError(null);
@@ -1075,21 +1483,6 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('app-zoom-level', zoomLevel.toString());
   }, [zoomLevel]);
-
-  const formatCurrencyParts = (value: number) => {
-    try {
-      const parts = new Intl.NumberFormat("pt-BR", {
-        style: "currency",
-        currency: "BRL",
-      }).formatToParts(value);
-      
-      const symbol = parts.find(p => p.type === 'currency')?.value || "R$";
-      const amount = parts.filter(p => p.type !== 'currency').map(p => p.value).join('').trim();
-      return { symbol, amount };
-    } catch (e) {
-      return { symbol: "R$", amount: value.toFixed(2).replace('.', ',') };
-    }
-  };
 
   const formatCurrency = (value: number) => {
     const { symbol, amount } = formatCurrencyParts(value);
@@ -1301,59 +1694,22 @@ export default function App() {
 
             {activeTab === "home" ? (
               <>
-                {/* Salary Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   <motion.div 
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
-                    className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/20 shadow-xl flex flex-col min-h-[110px] justify-center"
+                    className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/20 shadow-xl flex flex-col cursor-pointer hover:bg-white/15 transition-all min-h-[110px] justify-center"
+                    onClick={() => setIsSalaryModalOpen(true)}
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <Label htmlFor="salary" className="text-white/70 text-[10px] uppercase font-bold block tracking-widest">Meu Salário</Label>
+                      <Label className="text-white/70 text-[10px] uppercase font-bold block tracking-widest cursor-pointer">Meus Salários</Label>
                       {isSavingSalary && (
                         <div className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin" />
                       )}
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-baseline gap-2 overflow-hidden">
                       <span className="text-white/50 text-lg font-bold shrink-0">R$</span>
-                      <Input
-                        id="salary"
-                        type="number"
-                        value={salary || ""}
-                        onChange={(e) => {
-                          const val = parseFloat(e.target.value) || 0;
-                          handleSalaryChange(val, false);
-                        }}
-                        className="bg-transparent border-none text-2xl font-bold text-white focus-visible:ring-0 h-auto p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none w-full"
-                        placeholder="0,00"
-                      />
-                    </div>
-                  </motion.div>
-
-                  <motion.div 
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/20 shadow-xl flex flex-col min-h-[110px] justify-center"
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <Label htmlFor="secondarySalary" className="text-white/70 text-[10px] uppercase font-bold block tracking-widest">Salário Adicional</Label>
-                      {isSavingSalary && (
-                        <div className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-white/50 text-lg font-bold shrink-0">R$</span>
-                      <Input
-                        id="secondarySalary"
-                        type="number"
-                        value={secondarySalary || ""}
-                        onChange={(e) => {
-                          const val = parseFloat(e.target.value) || 0;
-                          handleSalaryChange(val, true);
-                        }}
-                        className="bg-transparent border-none text-2xl font-bold text-white focus-visible:ring-0 h-auto p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none w-full"
-                        placeholder="0,00"
-                      />
+                      <span className="text-2xl font-bold text-white truncate">{(salary + secondarySalary).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                     </div>
                   </motion.div>
 
@@ -1390,8 +1746,8 @@ export default function App() {
                       </div>
                       <div className="text-[10px] font-bold text-white/70 uppercase mb-1 tracking-widest">Rendimentos</div>
                       <div className="flex items-baseline gap-1">
-                        <span className="text-xs opacity-50 font-bold">R$</span>
-                        <div className="text-xl font-bold truncate">{formatCurrencyParts(totalIncome).amount}</div>
+                        <span className="text-[10px] opacity-50 font-bold">R$</span>
+                        <div className="text-lg sm:text-xl font-bold truncate">{formatCurrencyParts(totalIncome).amount}</div>
                       </div>
                     </Card>
                   </motion.div>
@@ -1401,10 +1757,20 @@ export default function App() {
                       <div className="absolute top-0 right-0 p-2 opacity-10">
                         <ArrowDownCircle className="w-8 h-8" />
                       </div>
-                      <div className="text-[10px] font-bold text-white/70 uppercase mb-1 tracking-widest">Despesas</div>
-                      <div className="flex items-baseline gap-1 text-red-300">
+                      <div className="text-[10px] font-bold text-white/70 uppercase mb-1 tracking-widest">A Pagar</div>
+                      <div className="flex items-baseline gap-1 text-red-300 mb-2">
                         <span className="text-xs opacity-50 font-bold">R$</span>
-                        <div className="text-xl font-bold truncate">{formatCurrencyParts(totalMonthlyExpenses).amount}</div>
+                        <div className="text-xl font-bold truncate">{formatCurrencyParts(totalRemainingExpenses).amount}</div>
+                      </div>
+                      <div className="flex flex-col gap-1 border-t border-white/5 pt-2">
+                        <div className="flex justify-between text-[17px] uppercase tracking-tight">
+                          <span className="text-white/40">Pago:</span>
+                          <span className="text-green-400 font-bold">{formatCurrency(totalPaidExpenses)}</span>
+                        </div>
+                        <div className="flex justify-between text-[17px] uppercase tracking-tight">
+                          <span className="text-white/40">Total:</span>
+                          <span className="text-white/60 font-medium">{formatCurrency(totalMonthlyExpenses)}</span>
+                        </div>
                       </div>
                     </Card>
                   </motion.div>
@@ -1457,6 +1823,9 @@ export default function App() {
               >
                 <div className="p-6 border-b border-white/10 flex justify-between items-center">
                   <h2 className="text-xl font-bold">Despesas Fixas</h2>
+                  <div className="text-sm font-bold text-green-400 bg-green-400/10 px-3 py-1 rounded-full">
+                    {formatCurrency(fixedExpenses.reduce((sum, exp) => sum + exp.value, 0))}
+                  </div>
                   <Badge variant="outline" className="text-white border-white/30">
                     {fixedExpenses.length} itens
                   </Badge>
@@ -1512,6 +1881,7 @@ export default function App() {
                         const date = new Date(dateStr + "T12:00:00");
                         const dayOfWeek = date.toLocaleString('pt-BR', { weekday: 'long' });
                         const formattedDate = formatDate(dateStr);
+                        const dailyTotal = grouped[dateStr].reduce((sum, exp) => sum + exp.value, 0);
 
                         return (
                           <div key={dateStr} className="space-y-3">
@@ -1519,7 +1889,7 @@ export default function App() {
                               <div className="h-px flex-1 bg-white/10" />
                               <div className="text-[10px] uppercase font-bold text-white/40 tracking-widest flex items-center gap-2">
                                 <CalendarIcon className="w-3 h-3" />
-                                {formattedDate} • <span className="text-blue-300">{dayOfWeek}</span>
+                                {formattedDate} • <span className="text-blue-300">{dayOfWeek}</span> • <span className="text-green-400">{formatCurrency(dailyTotal)}</span>
                               </div>
                               <div className="h-px flex-1 bg-white/10" />
                             </div>
@@ -1563,6 +1933,205 @@ export default function App() {
               </div>
             </motion.div>
           </>
+        ) : activeTab === "debtors" ? (
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            className="space-y-6 pb-32"
+          >
+            {/* Summary Cards and PIX Card */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3 md:col-span-2">
+                <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}>
+                  <Card className="bg-white/10 backdrop-blur-md border-white/20 text-white overflow-hidden relative p-4 rounded-2xl h-full shadow-xl">
+                    <div className="absolute top-0 right-0 p-2 opacity-10">
+                      <UserIcon className="w-8 h-8" />
+                    </div>
+                    <div className="text-[10px] font-bold text-white/70 uppercase mb-1 tracking-widest">A Receber</div>
+                    <div className="text-xl font-bold truncate text-blue-300">
+                      {formatCurrency(totalDebtors - totalReceivedDebtors)}
+                    </div>
+                  </Card>
+                </motion.div>
+                <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.1 }}>
+                  <Card className="bg-white/10 backdrop-blur-md border-white/20 text-white overflow-hidden relative p-4 rounded-2xl h-full shadow-xl">
+                    <div className="absolute top-0 right-0 p-2 opacity-10">
+                      <Check className="w-8 h-8" />
+                    </div>
+                    <div className="text-[10px] font-bold text-white/70 uppercase mb-1 tracking-widest">Recebido</div>
+                    <div className="text-xl font-bold truncate text-green-300">
+                      {formatCurrency(totalReceivedDebtors)}
+                    </div>
+                  </Card>
+                </motion.div>
+              </div>
+
+              {/* PIX Card */}
+              <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.2 }}>
+                <Card className="bg-white/15 backdrop-blur-md border-white/30 text-white overflow-hidden relative p-4 rounded-2xl h-full shadow-xl border-l-4 border-l-blue-400">
+                  <div className="flex justify-between items-center mb-2">
+                    <div className="text-[10px] font-bold text-white/70 uppercase tracking-widest">Minha Chave PIX</div>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => setIsEditingPix(!isEditingPix)}
+                      className="h-6 w-6 text-white/50 hover:text-white hover:bg-white/10"
+                    >
+                      <Edit2 className="w-3 h-3" />
+                    </Button>
+                  </div>
+                  
+                  {isEditingPix ? (
+                    <div className="flex gap-2 animate-in fade-in zoom-in-95 duration-200">
+                      <Input 
+                        value={pixKey}
+                        onChange={(e) => setPixKey(e.target.value)}
+                        placeholder="CPF, E-mail, etc"
+                        className="h-8 bg-white/10 border-white/20 text-xs text-white"
+                        autoFocus
+                      />
+                      <Button 
+                        size="sm" 
+                        onClick={() => { savePixKey(pixKey); setIsEditingPix(false); }}
+                        className="h-8 bg-blue-500 hover:bg-blue-600 text-white px-2"
+                      >
+                        <Check className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-sm font-mono font-bold truncate text-blue-100 flex-1">
+                        {pixKey || <span className="text-white/30 font-sans italic font-normal">Não cadastrada</span>}
+                      </div>
+                      {pixKey && (
+                        <div className="flex gap-1">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={copyPixToClipboard}
+                            className="h-7 w-7 text-white/60 hover:text-white hover:bg-white/10"
+                            title="Copiar PIX"
+                          >
+                            {pixCopied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </Card>
+              </motion.div>
+            </div>
+
+            {/* Month Selector */}
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex items-center justify-center gap-6 bg-white/10 backdrop-blur-md p-6 rounded-3xl border border-white/20 shadow-xl"
+            >
+              <Button variant="ghost" size="icon" onClick={() => changeMonth(-1)} className="text-white hover:bg-white/10 h-12 w-12 rounded-2xl">
+                <ChevronLeft className="w-6 h-6" />
+              </Button>
+              <div className="text-center min-w-[160px]">
+                <div className="text-xs uppercase font-bold text-white/50 tracking-widest mb-1">{year}</div>
+                <div className="text-2xl font-bold capitalize">{monthName}</div>
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => changeMonth(1)} className="text-white hover:bg-white/10 h-12 w-12 rounded-2xl">
+                <ChevronRight className="w-6 h-6" />
+              </Button>
+            </motion.div>
+
+            {/* Fixed Debtors Card */}
+            {fixedDebtors.length > 0 && (
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-white/10 backdrop-blur-md rounded-3xl border border-white/20 shadow-2xl overflow-hidden"
+              >
+                <div className="p-6 border-b border-white/10 flex justify-between items-center">
+                  <h2 className="text-xl font-bold">Devedores Fixos</h2>
+                  <Badge variant="outline" className="text-white border-white/30">
+                    {fixedDebtors.length} itens
+                  </Badge>
+                </div>
+                <div className="p-6 space-y-3">
+                  {fixedDebtors.map((debtor) => (
+                    <DebtorItem
+                      key={`${debtor.id}-${currentDate.toISOString().slice(0, 7)}`}
+                      debtor={debtor}
+                      currentMonthStr={currentDate.toISOString().slice(0, 7)}
+                      onToggleReceived={handleToggleDebtorReceived}
+                      onEdit={handleEditDebtor}
+                      onDelete={handleDeleteDebtor}
+                      formatCurrency={formatCurrency}
+                      formatDate={formatDate}
+                    />
+                  ))}
+                </div>
+              </motion.div>
+            )}
+
+            {/* Variable Debtors Card */}
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white/10 backdrop-blur-md rounded-3xl border border-white/20 shadow-2xl overflow-hidden"
+            >
+              <div className="p-6 border-b border-white/10 flex flex-col gap-4">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-xl font-bold">Devedores do Mês</h2>
+                  <Badge variant="outline" className="text-white border-white/30">
+                    {variableDebtors.length} itens
+                  </Badge>
+                </div>
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={() => { resetDebtorForm(); setIsDebtorModalOpen(true); }}
+                    className="flex-1 bg-blue-500 hover:bg-blue-600 text-white rounded-xl h-10 text-xs font-bold transition-all shadow-lg"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Novo Devedor
+                  </Button>
+                  <Button 
+                    onClick={() => setIsBillingModalOpen(true)}
+                    variant="outline"
+                    className="flex-1 border-white/20 bg-white/5 hover:bg-white/10 text-white rounded-xl h-10 text-xs font-bold transition-all"
+                  >
+                    <Share2 className="w-4 h-4 mr-2" />
+                    Gerar Cobrança
+                  </Button>
+                </div>
+              </div>
+              <div className="p-6">
+                {variableDebtors.length > 0 ? (
+                  <div className="space-y-3">
+                    <AnimatePresence mode="popLayout">
+                      {variableDebtors.map((debtor) => (
+                        <DebtorItem
+                          key={debtor.id}
+                          debtor={debtor}
+                          currentMonthStr={currentDate.toISOString().slice(0, 7)}
+                          onToggleReceived={handleToggleDebtorReceived}
+                          onEdit={handleEditDebtor}
+                          onDelete={handleDeleteDebtor}
+                          formatCurrency={formatCurrency}
+                          formatDate={formatDate}
+                          installmentInfo={debtor.isRecurring ? `${debtor.installmentIndex}/${debtor.repeatCount}` : undefined}
+                        />
+                      ))}
+                    </AnimatePresence>
+                  </div>
+                ) : (
+                  <div className="text-center py-12 bg-white/5 rounded-2xl border border-dashed border-white/10">
+                    <div className="bg-white/10 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <TrendingUp className="w-6 h-6 text-white/40" />
+                    </div>
+                    <p className="text-white/40 font-medium">Nenhum devedor este mês</p>
+                    <p className="text-[10px] text-white/20 mt-1 uppercase tracking-widest">Clique em "Novo Devedor" para começar</p>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
         ) : (
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
@@ -1726,6 +2295,17 @@ export default function App() {
               >
                 <Home className="w-6 h-6" />
               </Button>
+
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => setActiveTab("debtors")}
+                className={cn("w-12 h-12 rounded-full transition-all", activeTab === "debtors" ? "bg-white text-[#144a95]" : "text-white/60")}
+                title="Devedores"
+              >
+                <UserIcon className="w-6 h-6" />
+              </Button>
+
               <Button 
                 variant="ghost" 
                 size="icon" 
@@ -1773,9 +2353,213 @@ export default function App() {
     </>
   )}
 
+      {/* Salary Modal */}
+      <Dialog open={isSalaryModalOpen} onOpenChange={setIsSalaryModalOpen}>
+        <DialogContent className="bg-[#144a95] border-white/20 text-white w-[95vw] sm:max-w-[425px] rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold flex items-center gap-2">
+              <Wallet className="w-6 h-6 text-blue-300" />
+              Meus Salários
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-6 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="modal-salary" className="text-white/70">Salário Principal</Label>
+              <div className="relative">
+                <Input
+                  id="modal-salary"
+                  type="number"
+                  value={salary || ""}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value) || 0;
+                    handleSalaryChange(val, false);
+                  }}
+                  className="bg-white/5 border-white/10 text-white pl-10 h-12 rounded-xl focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  placeholder="0,00"
+                />
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 font-bold">R$</span>
+              </div>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="modal-secondarySalary" className="text-white/70">Salário Adicional</Label>
+              <div className="relative">
+                <Input
+                  id="modal-secondarySalary"
+                  type="number"
+                  value={secondarySalary || ""}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value) || 0;
+                    handleSalaryChange(val, true);
+                  }}
+                  className="bg-white/5 border-white/10 text-white pl-10 h-12 rounded-xl focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  placeholder="0,00"
+                />
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 font-bold">R$</span>
+              </div>
+            </div>
+
+            <div className="bg-white/5 p-4 rounded-2xl border border-white/10 flex justify-between items-center">
+              <span className="text-sm text-white/70 uppercase font-bold tracking-wider">Total Mensal</span>
+              <span className="text-2xl font-bold text-blue-300">
+                {(salary + secondarySalary).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+              </span>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              onClick={() => setIsSalaryModalOpen(false)}
+              className="bg-blue-500 hover:bg-blue-600 text-white w-full rounded-xl h-12 font-bold shadow-lg"
+            >
+              Concluir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add/Edit Debtor Modal */}
+      <Dialog open={isDebtorModalOpen} onOpenChange={setIsDebtorModalOpen}>
+        <DialogContent className="bg-[#144a95] border-white/20 text-white w-[95vw] sm:max-w-[425px] max-h-[90vh] overflow-y-auto rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold">
+              {editingDebtor ? "Editar Devedor" : "Novo Devedor"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-6 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="debtor-date" className="text-white/70">Data</Label>
+              <div className="relative">
+                <Input
+                  id="debtor-date"
+                  type="date"
+                  value={debtorFormData.date}
+                  onChange={(e) => setDebtorFormData({ ...debtorFormData, date: e.target.value })}
+                  className="bg-white/5 border-white/10 text-white pl-10 h-12 rounded-xl focus:ring-blue-500"
+                />
+                <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
+              </div>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="debtor-description" className="text-white/70">Nome do Devedor</Label>
+              <Input
+                id="debtor-description"
+                value={debtorFormData.description}
+                onChange={(e) => setDebtorFormData({ ...debtorFormData, description: e.target.value })}
+                placeholder="Ex: João Silva"
+                className="bg-white/5 border-white/10 text-white h-12 rounded-xl focus:ring-blue-500"
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="debtor-value" className="text-white/70">Valor</Label>
+              <div className="relative">
+                <Input
+                  id="debtor-value"
+                  type="number"
+                  value={debtorFormData.value || ""}
+                  onChange={(e) => setDebtorFormData({ ...debtorFormData, value: parseFloat(e.target.value) || 0 })}
+                  placeholder="0,00"
+                  className="bg-white/5 border-white/10 text-white pl-10 h-12 rounded-xl focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 font-bold">R$</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex items-center space-x-2 bg-white/5 p-4 rounded-xl border border-white/10">
+                <Checkbox 
+                  id="debtor-fixed" 
+                  checked={!!debtorFormData.isFixed}
+                  onCheckedChange={(checked) => setDebtorFormData({ ...debtorFormData, isFixed: !!checked, isRecurring: false })}
+                />
+                <Label htmlFor="debtor-fixed" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Fixa</Label>
+              </div>
+              <div className="flex items-center space-x-2 bg-white/5 p-4 rounded-xl border border-white/10">
+                <Checkbox 
+                  id="debtor-recurring" 
+                  checked={!!debtorFormData.isRecurring}
+                  onCheckedChange={(checked) => setDebtorFormData({ ...debtorFormData, isRecurring: !!checked, isFixed: false })}
+                />
+                <Label htmlFor="debtor-recurring" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Parcelada</Label>
+              </div>
+            </div>
+
+            {debtorFormData.isRecurring && (
+              <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2">
+                <div className="grid gap-2">
+                  <Label htmlFor="debtor-repeatCount" className="text-white/70 text-xs">Parcelas</Label>
+                  <Input
+                    id="debtor-repeatCount"
+                    type="number"
+                    min="2"
+                    value={debtorFormData.repeatCount}
+                    onChange={(e) => setDebtorFormData({ ...debtorFormData, repeatCount: parseInt(e.target.value) || 1 })}
+                    className="bg-white/5 border-white/10 text-white h-11 rounded-xl"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="debtor-frequency" className="text-white/70 text-xs">Frequência</Label>
+                  <Select 
+                    value={debtorFormData.repeatFrequency} 
+                    onValueChange={(val: any) => setDebtorFormData({ ...debtorFormData, repeatFrequency: val })}
+                  >
+                    <SelectTrigger id="debtor-frequency" className="bg-white/5 border-white/10 text-white h-11 rounded-xl">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-[#144a95] border-white/20 text-white">
+                      <SelectItem value="monthly">Mensal</SelectItem>
+                      <SelectItem value="yearly">Anual</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+
+            <div className="grid gap-2">
+              <Label htmlFor="debtor-notes" className="text-white/70">Observações (Opcional)</Label>
+              <Input
+                id="debtor-notes"
+                value={debtorFormData.notes}
+                onChange={(e) => setDebtorFormData({ ...debtorFormData, notes: e.target.value })}
+                placeholder="Ex: Emprestado para o conserto do carro"
+                className="bg-white/5 border-white/10 text-white h-12 rounded-xl focus:ring-blue-500"
+              />
+            </div>
+
+            {validationError && (
+              <div className="bg-red-500/20 border border-red-500/50 p-3 rounded-xl flex items-center gap-2 text-red-200 text-sm animate-in shake-1">
+                <AlertCircle className="w-4 h-4" />
+                {validationError}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="ghost" 
+              onClick={() => setIsDebtorModalOpen(false)}
+              className="text-white hover:bg-white/10"
+            >
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleAddDebtor}
+              disabled={isSaving}
+              className="bg-blue-500 hover:bg-blue-600 text-white px-8 rounded-xl h-12 font-bold shadow-lg shadow-blue-500/20"
+            >
+              {isSaving ? (
+                <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+              ) : (
+                editingDebtor ? "Salvar Alterações" : "Adicionar Devedor"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Add/Edit Expense Modal */}
       <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
-        <DialogContent className="bg-[#144a95] border-white/20 text-white sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="bg-[#144a95] border-white/20 text-white w-[95vw] sm:max-w-[425px] max-h-[90vh] overflow-y-auto rounded-3xl">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold">
               {editingExpense ? "Editar Despesa" : "Nova Despesa"}
@@ -1791,6 +2575,19 @@ export default function App() {
                   type="date"
                   value={formData.date}
                   onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                  className="bg-white/10 border-white/20 text-white pl-10"
+                />
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="dueDate" className="text-white/70">Data de Vencimento (Opcional)</Label>
+              <div className="relative">
+                <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/50" />
+                <Input
+                  id="dueDate"
+                  type="date"
+                  value={formData.dueDate}
+                  onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
                   className="bg-white/10 border-white/20 text-white pl-10"
                 />
               </div>
@@ -1849,7 +2646,7 @@ export default function App() {
                 <div className="flex items-center space-x-2">
                   <Checkbox 
                     id="fixed" 
-                    checked={formData.isFixed}
+                    checked={!!formData.isFixed}
                     onCheckedChange={(checked) => setFormData({ ...formData, isFixed: !!checked })}
                     className="border-white/30 data-[state=checked]:bg-white data-[state=checked]:text-[#144a95]"
                   />
@@ -1860,12 +2657,12 @@ export default function App() {
                 <div className="flex items-center space-x-2">
                   <Checkbox 
                     id="recurring" 
-                    checked={formData.isRecurring}
+                    checked={!!formData.isRecurring}
                     onCheckedChange={(checked) => setFormData({ ...formData, isRecurring: !!checked })}
                     className="border-white/30 data-[state=checked]:bg-white data-[state=checked]:text-[#144a95]"
                   />
                   <Label htmlFor="recurring" className="text-sm font-medium leading-none">
-                    Repetir
+                    Recorrente
                   </Label>
                 </div>
               </div>
@@ -1939,7 +2736,7 @@ export default function App() {
 
       {/* Add/Edit Additional Salary Modal */}
       <Dialog open={isAdditionalSalaryModalOpen} onOpenChange={setIsAdditionalSalaryModalOpen}>
-        <DialogContent className="bg-[#144a95] border-white/20 text-white sm:max-w-[425px]">
+        <DialogContent className="bg-[#144a95] border-white/20 text-white w-[95vw] sm:max-w-[425px] rounded-3xl">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold">
               {editingAdditionalSalary ? "Editar Salário Adicional" : "Novo Salário Adicional"}
@@ -2015,7 +2812,7 @@ export default function App() {
 
       {/* Recurring Action Confirmation Modal */}
       <Dialog open={isRecurringActionModalOpen} onOpenChange={setIsRecurringActionModalOpen}>
-        <DialogContent className="bg-[#144a95] border-white/20 text-white sm:max-w-[400px]">
+        <DialogContent className="bg-[#144a95] border-white/20 text-white w-[95vw] sm:max-w-[400px] rounded-3xl">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold">
               {recurringActionType === "edit" ? "Confirmar Alteração" : "Confirmar Exclusão"}
@@ -2069,7 +2866,7 @@ export default function App() {
 
       {/* Delete Additional Salary Confirmation Modal */}
       <Dialog open={isDeleteAdditionalSalaryConfirmModalOpen} onOpenChange={setIsDeleteAdditionalSalaryConfirmModalOpen}>
-        <DialogContent className="bg-[#144a95] border-white/20 text-white sm:max-w-[400px]">
+        <DialogContent className="bg-[#144a95] border-white/20 text-white w-[95vw] sm:max-w-[400px] rounded-3xl">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold">Confirmar Exclusão</DialogTitle>
           </DialogHeader>
@@ -2099,7 +2896,7 @@ export default function App() {
 
       {/* Additional Salary List Modal */}
       <Dialog open={isAdditionalSalaryListModalOpen} onOpenChange={setIsAdditionalSalaryListModalOpen}>
-        <DialogContent className="bg-[#144a95] border-white/20 text-white sm:max-w-[450px]">
+        <DialogContent className="bg-[#144a95] border-white/20 text-white w-[95vw] sm:max-w-[450px] rounded-3xl">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold flex items-center gap-2">
               <ArrowUpCircle className="w-5 h-5 text-green-400" />
@@ -2153,26 +2950,30 @@ export default function App() {
 
       {/* Delete Confirmation Modal */}
       <Dialog open={isDeleteConfirmModalOpen} onOpenChange={setIsDeleteConfirmModalOpen}>
-        <DialogContent className="bg-[#144a95] border-white/20 text-white sm:max-w-[400px]">
+        <DialogContent className="bg-[#144a95] border-white/20 text-white w-[95vw] sm:max-w-[400px] rounded-3xl">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold">Confirmar Exclusão</DialogTitle>
           </DialogHeader>
           <div className="py-4">
             <p className="text-sm text-white/70">
-              Tem certeza que deseja excluir esta despesa? Esta ação não pode ser desfeita.
+              Tem certeza que deseja excluir {debtorToDelete ? "este devedor" : "esta despesa"}? Esta ação não pode ser desfeita.
             </p>
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
             <Button 
               variant="ghost" 
-              onClick={() => setIsDeleteConfirmModalOpen(false)}
+              onClick={() => {
+                setIsDeleteConfirmModalOpen(false);
+                setDebtorToDelete(null);
+                setExpenseToDelete(null);
+              }}
               className="text-white/50 hover:text-white hover:bg-white/10"
             >
               Cancelar
             </Button>
             <Button 
               variant="destructive" 
-              onClick={confirmDeleteExpense}
+              onClick={debtorToDelete ? confirmDeleteDebtor : confirmDeleteExpense}
               className="bg-red-500 hover:bg-red-600 text-white"
             >
               Excluir
@@ -2183,7 +2984,7 @@ export default function App() {
 
       {/* New Category Modal */}
       <Dialog open={isCategoryModalOpen} onOpenChange={setIsCategoryModalOpen}>
-        <DialogContent className="bg-[#144a95] border-white/20 text-white sm:max-w-[300px]">
+        <DialogContent className="bg-[#144a95] border-white/20 text-white w-[95vw] sm:max-w-[300px] rounded-3xl">
           <DialogHeader>
             <DialogTitle>Nova Categoria</DialogTitle>
           </DialogHeader>
@@ -2207,62 +3008,160 @@ export default function App() {
         </DialogContent>
       </Dialog>
 
-      {/* Share Modal */}
-      <Dialog open={isShareModalOpen} onOpenChange={setIsShareModalOpen}>
-        <DialogContent className="bg-[#144a95] border-white/20 text-white rounded-3xl max-w-[90vw] sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-2xl">
-              <Share2 className="w-6 h-6 text-blue-400" />
-              Compartilhar App
-            </DialogTitle>
-          </DialogHeader>
-          <div className="py-6 space-y-6">
-            <div className="bg-white/5 p-6 rounded-2xl border border-white/10 space-y-4">
-              <p className="text-sm text-white/70 leading-relaxed">
-                Compartilhe o link abaixo para que outras pessoas possam gerenciar suas finanças de forma independente com login Google.
-              </p>
-              <div className="flex items-center gap-2 bg-black/20 p-3 rounded-xl border border-white/10">
-                <code className="flex-1 text-sm font-mono text-blue-300 truncate">
-                  {window.location.host}
-                </code>
-                <Button 
-                  size="sm" 
-                  variant="ghost" 
-                  onClick={copyToClipboard}
-                  className="h-8 px-3 bg-white/10 hover:bg-white/20 text-white gap-2"
-                >
-                  {copied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
-                  {copied ? "Copiado" : "Copiar"}
-                </Button>
-              </div>
+      {/* Billing Modal */}
+      <Dialog open={isBillingModalOpen} onOpenChange={setIsBillingModalOpen}>
+        <DialogContent className="bg-[#144a95] border-white/20 text-white rounded-3xl w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto p-0">
+          <div className="p-6">
+            <DialogHeader className="mb-6">
+              <DialogTitle className="flex items-center gap-2 text-xl">
+                <Share2 className="w-5 h-5 text-blue-400" />
+                Gerar Cobrança
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-6">
+              {!selectedDebtorForBilling ? (
+                <div className="space-y-4">
+                  <p className="text-sm text-white/70">Selecione um devedor para gerar a mensagem:</p>
+                  <div className="space-y-2">
+                    {[...fixedDebtors, ...variableDebtors].length === 0 ? (
+                      <p className="text-center py-8 text-white/40 italic">Nenhum devedor cadastrado.</p>
+                    ) : (
+                      [...fixedDebtors, ...variableDebtors].map((debtor) => (
+                        <button
+                          key={debtor.id}
+                          onClick={() => generateBillingMessage(debtor)}
+                          className="w-full flex items-center justify-between p-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl transition-all text-left"
+                        >
+                          <div>
+                            <div className="font-bold">{debtor.description}</div>
+                            <div className="text-xs text-white/50">{formatDate(debtor.date)}</div>
+                          </div>
+                          <div className="font-bold text-blue-300">{formatCurrency(debtor.value)}</div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                  <div className="bg-white/5 p-4 rounded-2xl border border-white/10 space-y-4">
+                    <div className="flex justify-between items-center">
+                      <h4 className="text-[10px] font-bold uppercase tracking-widest text-white/40">Mensagem Gerada</h4>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => setSelectedDebtorForBilling(null)}
+                        className="h-6 text-[10px] text-blue-400 hover:text-blue-300 px-2"
+                      >
+                        Alterar Devedor
+                      </Button>
+                    </div>
+                    <div className="bg-black/20 p-4 rounded-xl border border-white/10 whitespace-pre-wrap text-sm text-white/90 font-medium leading-relaxed">
+                      {billingMessage}
+                    </div>
+                    <div className="flex flex-col gap-2 pt-2">
+                      <Button 
+                        onClick={copyBillingToClipboard}
+                        className="w-full bg-white text-[#144a95] hover:bg-white/90 font-bold gap-2 h-12"
+                      >
+                        {billingCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                        {billingCopied ? "Copiado" : "Copiar Texto"}
+                      </Button>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button 
+                          onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(billingMessage)}`, '_blank')}
+                          variant="outline"
+                          className="border-green-500/30 bg-green-500/10 hover:bg-green-500/20 text-green-400 font-bold gap-2 h-12"
+                        >
+                          <Share2 className="w-4 h-4" />
+                          WhatsApp
+                        </Button>
+                        <Button 
+                          onClick={shareBillingMessage}
+                          variant="outline"
+                          className="border-white/20 bg-white/5 hover:bg-white/10 text-white font-bold gap-2 h-12"
+                        >
+                          <Share2 className="w-4 h-4" />
+                          Outros
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-            
-            <div className="space-y-3">
-              <h4 className="text-xs font-bold uppercase tracking-widest text-white/40">Como funciona?</h4>
-              <ul className="space-y-2 text-sm text-white/60">
-                <li className="flex items-start gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 shrink-0" />
-                  <span>Cada usuário tem seu próprio espaço seguro.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 shrink-0" />
-                  <span>Acesso via conta Google para máxima segurança.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 shrink-0" />
-                  <span>Dados salvos automaticamente na nuvem.</span>
-                </li>
-              </ul>
+            <div className="mt-6">
+              <Button 
+                onClick={() => {
+                  setIsBillingModalOpen(false);
+                  setTimeout(() => setSelectedDebtorForBilling(null), 300);
+                }}
+                className="w-full bg-white/10 text-white hover:bg-white/20 font-bold py-6 rounded-2xl border border-white/10"
+              >
+                Fechar
+              </Button>
             </div>
           </div>
-          <DialogFooter>
-            <Button 
-              onClick={() => setIsShareModalOpen(false)}
-              className="w-full bg-white text-[#144a95] hover:bg-white/90 font-bold py-6 rounded-2xl"
-            >
-              Fechar
-            </Button>
-          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Share Modal */}
+      <Dialog open={isShareModalOpen} onOpenChange={setIsShareModalOpen}>
+        <DialogContent className="bg-[#144a95] border-white/20 text-white rounded-3xl w-[95vw] sm:max-w-md p-0">
+          <div className="p-6">
+            <DialogHeader className="mb-6">
+              <DialogTitle className="flex items-center gap-2 text-xl">
+                <Share2 className="w-5 h-5 text-blue-400" />
+                Compartilhar App
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-6">
+              <div className="bg-white/5 p-4 rounded-2xl border border-white/10 space-y-4">
+                <p className="text-sm text-white/70 leading-relaxed">
+                  Compartilhe o link abaixo para que outras pessoas possam gerenciar suas finanças de forma independente com login Google.
+                </p>
+                <div className="flex flex-col gap-2 bg-black/20 p-3 rounded-xl border border-white/10">
+                  <code className="text-xs font-mono text-blue-300 break-all py-1">
+                    {window.location.origin}
+                  </code>
+                  <Button 
+                    size="sm" 
+                    onClick={copyToClipboard}
+                    className="w-full h-10 bg-white/10 hover:bg-white/20 text-white gap-2 font-bold"
+                  >
+                    {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
+                    {copied ? "Copiado" : "Copiar Link"}
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="space-y-3">
+                <h4 className="text-[10px] font-bold uppercase tracking-widest text-white/40">Como funciona?</h4>
+                <ul className="space-y-2 text-sm text-white/60">
+                  <li className="flex items-start gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 shrink-0" />
+                    <span>Cada usuário tem seu próprio espaço seguro.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 shrink-0" />
+                    <span>Acesso via conta Google para máxima segurança.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 shrink-0" />
+                    <span>Dados salvos automaticamente na nuvem.</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+            <div className="mt-6">
+              <Button 
+                onClick={() => setIsShareModalOpen(false)}
+                className="w-full bg-white text-[#144a95] hover:bg-white/90 font-bold py-6 rounded-2xl"
+              >
+                Fechar
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

@@ -26,6 +26,7 @@
         "repeatFrequency": { "type": "string", "enum": ["monthly", "yearly"] },
         "notes": { "type": "string" },
         "date": { "type": "string", "description": "Formato YYYY-MM-DD" },
+        "dueDate": { "type": "string", "description": "Data de vencimento opcional (YYYY-MM-DD)" },
         "parentId": { "type": "string" },
         "isPaid": { "type": "boolean" },
         "paidMonths": { "type": "array", "items": { "type": "string" } },
