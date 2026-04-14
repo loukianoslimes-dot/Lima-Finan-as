@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Plus, Trash2, Edit2, Wallet, ArrowUpCircle, ArrowDownCircle, ChevronLeft, ChevronRight, Calendar as CalendarIcon, BarChart3, Home, PieChart, TrendingUp, LogOut, LogIn, AlertCircle, GripVertical, Share2, Copy, Check, Download, Camera, User as UserIcon } from "lucide-react";
+import { Plus, Trash2, Edit2, Wallet, ArrowUpCircle, ArrowDownCircle, ChevronLeft, ChevronRight, ChevronDown, Calendar as CalendarIcon, BarChart3, Home, PieChart, TrendingUp, LogOut, LogIn, AlertCircle, GripVertical, Share2, Copy, Check, Download, Camera, User as UserIcon } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   BarChart, 
@@ -432,6 +432,8 @@ export default function App() {
   const [editingDebtor, setEditingDebtor] = useState<Debtor | null>(null);
   const [editingAdditionalSalary, setEditingAdditionalSalary] = useState<AdditionalSalary | null>(null);
   const [newCategory, setNewCategory] = useState("");
+  const [isFixedExpensesExpanded, setIsFixedExpensesExpanded] = useState(false);
+  const [isVariableExpensesExpanded, setIsVariableExpensesExpanded] = useState(false);
 
   const [userPhotoUrl, setUserPhotoUrl] = useState<string | null>(null);
 
@@ -1872,31 +1874,57 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
                 transition={{ delay: 0.4 }}
                 className="bg-white/10 backdrop-blur-md rounded-3xl border border-white/20 shadow-2xl overflow-hidden"
               >
-                <div className="p-6 border-b border-white/10 flex justify-between items-center">
-                  <h2 className="text-xl font-bold">Despesas Fixas</h2>
-                  <div className="text-sm font-bold text-green-400 bg-green-400/10 px-3 py-1 rounded-full">
-                    {formatCurrency(fixedExpenses.reduce((sum, exp) => sum + exp.value, 0))}
+                <button 
+                  className="w-full p-6 border-b border-white/10 flex justify-between items-center cursor-pointer hover:bg-white/5 transition-colors text-left"
+                  onClick={() => setIsFixedExpensesExpanded(!isFixedExpensesExpanded)}
+                  aria-expanded={isFixedExpensesExpanded}
+                >
+                  <div className="flex items-center gap-3">
+                    <h2 className="text-xl font-bold">Despesas Fixas</h2>
+                    <motion.div
+                      animate={{ rotate: isFixedExpensesExpanded ? 180 : 0 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <ChevronDown className="w-5 h-5 text-white/50" />
+                    </motion.div>
                   </div>
-                  <Badge variant="outline" className="text-white border-white/30">
-                    {fixedExpenses.length} itens
-                  </Badge>
-                </div>
-                <div className="p-6 space-y-3">
-                  {fixedExpenses.map((expense) => {
-                    return (
-                      <ExpenseItem
-                        key={`${expense.id}-${currentDate.toISOString().slice(0, 7)}`}
-                        expense={expense}
-                        currentMonthStr={currentDate.toISOString().slice(0, 7)}
-                        onTogglePaid={handleTogglePaid}
-                        onEdit={handleEditExpense}
-                        onDelete={handleDeleteExpense}
-                        formatCurrency={formatCurrency}
-                        formatDate={formatDate}
-                      />
-                    );
-                  })}
-                </div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-sm font-bold text-green-400 bg-green-400/10 px-3 py-1 rounded-full">
+                      {formatCurrency(fixedExpenses.reduce((sum, exp) => sum + exp.value, 0))}
+                    </div>
+                    <Badge variant="outline" className="text-white border-white/30">
+                      {fixedExpenses.length} itens
+                    </Badge>
+                  </div>
+                </button>
+                <AnimatePresence initial={false}>
+                  {isFixedExpensesExpanded && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.3, ease: "easeInOut" }}
+                      className="overflow-hidden"
+                    >
+                      <div className="p-6 space-y-3">
+                        {fixedExpenses.map((expense) => {
+                          return (
+                            <ExpenseItem
+                              key={`${expense.id}-${currentDate.toISOString().slice(0, 7)}`}
+                              expense={expense}
+                              currentMonthStr={currentDate.toISOString().slice(0, 7)}
+                              onTogglePaid={handleTogglePaid}
+                              onEdit={handleEditExpense}
+                              onDelete={handleDeleteExpense}
+                              formatCurrency={formatCurrency}
+                              formatDate={formatDate}
+                            />
+                          );
+                        })}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </motion.div>
             )}
 
@@ -1907,81 +1935,110 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
               transition={{ delay: 0.45 }}
               className="bg-white/10 backdrop-blur-md rounded-3xl border border-white/20 shadow-2xl overflow-hidden"
             >
-              <div className="p-6 border-b border-white/10 flex justify-between items-center">
-                <h2 className="text-xl font-bold">Outras Despesas</h2>
-                <Badge variant="outline" className="text-white border-white/30">
-                  {variableExpenses.length} itens
-                </Badge>
-              </div>
-              
-              <div className="p-6">
-                <div className="space-y-6">
-                  {variableExpenses.length === 0 ? (
-                    <div className="text-center py-12 text-white/50">
-                      Nenhuma outra despesa para este mês.
-                    </div>
-                  ) : (
-                    (() => {
-                      const grouped: Record<string, Expense[]> = {};
-                      variableExpenses.forEach(e => {
-                        if (!grouped[e.date]) grouped[e.date] = [];
-                        grouped[e.date].push(e);
-                      });
-
-                      return Object.keys(grouped).sort().map(dateStr => {
-                        const date = new Date(dateStr + "T12:00:00");
-                        const dayOfWeek = date.toLocaleString('pt-BR', { weekday: 'long' });
-                        const formattedDate = formatDate(dateStr);
-                        const dailyTotal = grouped[dateStr].reduce((sum, exp) => sum + exp.value, 0);
-
-                        return (
-                          <div key={dateStr} className="space-y-3">
-                            <div className="flex items-center gap-3">
-                              <div className="h-px flex-1 bg-white/10" />
-                              <div className="text-[10px] uppercase font-bold text-white/40 tracking-widest flex items-center gap-2">
-                                <CalendarIcon className="w-3 h-3" />
-                                {formattedDate} • <span className="text-blue-300">{dayOfWeek}</span> • <span className="text-green-400">{formatCurrency(dailyTotal)}</span>
-                              </div>
-                              <div className="h-px flex-1 bg-white/10" />
-                            </div>
-                            <div className="space-y-3">
-                              {grouped[dateStr].map(expense => {
-                                let installmentInfo = "";
-                                if (expense.isRecurring && expense.repeatCount && expense.repeatCount > 1) {
-                                  if (expense.installmentIndex) {
-                                    installmentInfo = `${expense.installmentIndex}x${expense.repeatCount}`;
-                                  } else if (expense.parentId) {
-                                    const siblings = expenses
-                                      .filter(e => e.parentId === expense.parentId)
-                                      .sort((a, b) => a.date.localeCompare(b.date));
-                                    const index = siblings.findIndex(s => s.id === expense.id);
-                                    if (index !== -1) {
-                                      installmentInfo = `${index + 1}x${expense.repeatCount}`;
-                                    }
-                                  }
-                                }
-                                return (
-                                  <ExpenseItem
-                                    key={`${expense.id}-${currentDate.toISOString().slice(0, 7)}`}
-                                    expense={expense}
-                                    currentMonthStr={currentDate.toISOString().slice(0, 7)}
-                                    onTogglePaid={handleTogglePaid}
-                                    onEdit={handleEditExpense}
-                                    onDelete={handleDeleteExpense}
-                                    formatCurrency={formatCurrency}
-                                    formatDate={formatDate}
-                                    installmentInfo={installmentInfo}
-                                  />
-                                );
-                              })}
-                            </div>
-                          </div>
-                        );
-                      });
-                    })()
-                  )}
+              <button 
+                className="w-full p-6 border-b border-white/10 flex justify-between items-center cursor-pointer hover:bg-white/5 transition-colors text-left"
+                onClick={() => setIsVariableExpensesExpanded(!isVariableExpensesExpanded)}
+                aria-expanded={isVariableExpensesExpanded}
+              >
+                <div className="flex items-center gap-3">
+                  <h2 className="text-xl font-bold">Despesas</h2>
+                  <motion.div
+                    animate={{ rotate: isVariableExpensesExpanded ? 180 : 0 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <ChevronDown className="w-5 h-5 text-white/50" />
+                  </motion.div>
                 </div>
-              </div>
+                <div className="flex items-center gap-3">
+                  <div className="text-sm font-bold text-green-400 bg-green-400/10 px-3 py-1 rounded-full">
+                    {formatCurrency(variableExpenses.reduce((sum, exp) => sum + exp.value, 0))}
+                  </div>
+                  <Badge variant="outline" className="text-white border-white/30">
+                    {variableExpenses.length} itens
+                  </Badge>
+                </div>
+              </button>
+              
+              <AnimatePresence initial={false}>
+                {isVariableExpensesExpanded && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.3, ease: "easeInOut" }}
+                    className="overflow-hidden"
+                  >
+                    <div className="p-6">
+                      <div className="space-y-6">
+                        {variableExpenses.length === 0 ? (
+                          <div className="text-center py-12 text-white/50">
+                            Nenhuma despesa para este mês.
+                          </div>
+                        ) : (
+                          (() => {
+                            const grouped: Record<string, Expense[]> = {};
+                            variableExpenses.forEach(e => {
+                              if (!grouped[e.date]) grouped[e.date] = [];
+                              grouped[e.date].push(e);
+                            });
+
+                            return Object.keys(grouped).sort().map(dateStr => {
+                              const date = new Date(dateStr + "T12:00:00");
+                              const dayOfWeek = date.toLocaleString('pt-BR', { weekday: 'long' });
+                              const formattedDate = formatDate(dateStr);
+                              const dailyTotal = grouped[dateStr].reduce((sum, exp) => sum + exp.value, 0);
+
+                              return (
+                                <div key={dateStr} className="space-y-3">
+                                  <div className="flex items-center gap-3">
+                                    <div className="h-px flex-1 bg-white/10" />
+                                    <div className="text-[10px] uppercase font-bold text-white/40 tracking-widest flex items-center gap-2">
+                                      <CalendarIcon className="w-3 h-3" />
+                                      {formattedDate} • <span className="text-blue-300">{dayOfWeek}</span> • <span className="text-green-400">{formatCurrency(dailyTotal)}</span>
+                                    </div>
+                                    <div className="h-px flex-1 bg-white/10" />
+                                  </div>
+                                  <div className="space-y-3">
+                                    {grouped[dateStr].map(expense => {
+                                      let installmentInfo = "";
+                                      if (expense.isRecurring && expense.repeatCount && expense.repeatCount > 1) {
+                                        if (expense.installmentIndex) {
+                                          installmentInfo = `${expense.installmentIndex}x${expense.repeatCount}`;
+                                        } else if (expense.parentId) {
+                                          const siblings = expenses
+                                            .filter(e => e.parentId === expense.parentId)
+                                            .sort((a, b) => a.date.localeCompare(b.date));
+                                          const index = siblings.findIndex(s => s.id === expense.id);
+                                          if (index !== -1) {
+                                            installmentInfo = `${index + 1}x${expense.repeatCount}`;
+                                          }
+                                        }
+                                      }
+                                      return (
+                                        <ExpenseItem
+                                          key={`${expense.id}-${currentDate.toISOString().slice(0, 7)}`}
+                                          expense={expense}
+                                          currentMonthStr={currentDate.toISOString().slice(0, 7)}
+                                          onTogglePaid={handleTogglePaid}
+                                          onEdit={handleEditExpense}
+                                          onDelete={handleDeleteExpense}
+                                          formatCurrency={formatCurrency}
+                                          formatDate={formatDate}
+                                          installmentInfo={installmentInfo}
+                                        />
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              );
+                            });
+                          })()
+                        )}
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </motion.div>
           </>
         ) : activeTab === "debtors" ? (
