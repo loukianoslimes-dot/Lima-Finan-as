@@ -436,6 +436,7 @@ export default function App() {
   const [isVariableExpensesExpanded, setIsVariableExpensesExpanded] = useState(false);
 
   const [userPhotoUrl, setUserPhotoUrl] = useState<string | null>(null);
+  const APP_VERSION = "1.0.5"; // Increment this to track updates
 
   const [systemConfig, setSystemConfig] = useState<{ appIconUrl?: string }>({});
   const isAdmin = user?.email === "loukianoslimes@gmail.com";
@@ -2388,6 +2389,38 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
               </div>
             </div>
           </motion.div>
+        )}
+
+        {/* Version Indicator & Cache Control */}
+        {user && (
+          <div className="flex flex-col items-center justify-center gap-2 mt-8 mb-32">
+            <div className="flex items-center gap-2 text-white/20 text-[10px] uppercase tracking-widest">
+              <AlertCircle className="w-3 h-3" />
+              <span>Versão {APP_VERSION}</span>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                if ('serviceWorker' in navigator) {
+                  navigator.serviceWorker.getRegistrations().then(registrations => {
+                    for (let registration of registrations) {
+                      registration.unregister();
+                    }
+                    caches.keys().then(names => {
+                      for (let name of names) caches.delete(name);
+                    });
+                    window.location.reload();
+                  });
+                } else {
+                  window.location.reload();
+                }
+              }}
+              className="text-[9px] text-white/40 hover:text-white/60 h-6 px-2 rounded-full border border-white/10"
+            >
+              Limpar Cache e Atualizar
+            </Button>
+          </div>
         )}
 
         {/* Navigation Bar (Mobile Friendly) */}

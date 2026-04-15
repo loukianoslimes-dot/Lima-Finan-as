@@ -19,8 +19,34 @@
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js')
-            .then(reg => console.log('Service Worker registrado!', reg))
+            .then(reg => {
+              console.log('Service Worker registrado!', reg);
+              
+              // Check for updates every time the page is loaded
+              reg.update();
+
+              reg.onupdatefound = () => {
+                const installingWorker = reg.installing;
+                installingWorker.onstatechange = () => {
+                  if (installingWorker.state === 'installed') {
+                    if (navigator.serviceWorker.controller) {
+                      // New content is available, but it will only be used when all tabs are closed
+                      console.log('Nova versão disponível! Por favor, recarregue a página.');
+                      // Optional: Show a UI notification to the user
+                    }
+                  }
+                };
+              };
+            })
             .catch(err => console.log('Erro ao registrar Service Worker', err));
+        });
+
+        // Ensure that the new service worker takes over immediately
+        let refreshing;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (refreshing) return;
+          window.location.reload();
+          refreshing = true;
         });
       }
     </script>
