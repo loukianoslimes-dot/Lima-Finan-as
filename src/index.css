@@ -146,15 +146,15 @@
   }
 
   .liquid-glass {
-    @apply backdrop-blur-2xl border border-white/20 shadow-2xl transition-all duration-300;
+    @apply backdrop-blur-3xl border border-white/5 shadow-2xl transition-all duration-300;
     background: linear-gradient(
       135deg,
-      rgba(255, 255, 255, 0.12) 0%,
-      rgba(255, 255, 255, 0.05) 100%
+      rgba(0, 0, 0, 0.45) 0%,
+      rgba(0, 0, 0, 0.25) 100%
     );
     box-shadow: 
-      0 8px 32px 0 rgba(0, 0, 0, 0.3),
-      inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+      0 12px 40px 0 rgba(0, 0, 0, 0.5),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.03);
   }
 
   .liquid-glass-hover {
