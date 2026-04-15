@@ -138,12 +138,11 @@ const DebtorItem: React.FC<DebtorItemProps> = ({
 
   return (
     <motion.div
-      initial={{ opacity: 0, x: -20 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 20 }}
-      layout
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
       className={cn(
-        "group bg-white/5 hover:bg-white/10 transition-all p-4 rounded-2xl border border-white/5 flex items-center justify-between gap-4",
+        "group bg-white/5 hover:bg-white/10 transition-colors p-4 rounded-2xl border border-white/5 flex items-center justify-between gap-4",
         debtor.isReceived && "bg-green-500/20 border-green-500/40 shadow-[0_0_15px_rgba(34,197,94,0.1)]"
       )}
     >
@@ -233,12 +232,11 @@ const ExpenseItem: React.FC<ExpenseItemProps> = ({
 
   return (
     <motion.div
-      initial={{ opacity: 0, x: -20 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 20 }}
-      layout
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
       className={cn(
-        "group bg-white/5 hover:bg-white/10 transition-all p-4 rounded-2xl border border-white/5 flex items-center justify-between gap-4",
+        "group bg-white/5 hover:bg-white/10 transition-colors p-4 rounded-2xl border border-white/5 flex items-center justify-between gap-4",
         expense.isPaid && "bg-green-500/20 border-green-500/40 shadow-[0_0_15px_rgba(34,197,94,0.1)]"
       )}
     >
@@ -334,8 +332,7 @@ const AdditionalSalaryItem: React.FC<AdditionalSalaryItemProps> = ({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
-      layout
-      className="group bg-white/5 hover:bg-white/10 p-3 rounded-2xl transition-all border border-white/5 flex items-center gap-4"
+      className="group bg-white/5 hover:bg-white/10 p-3 rounded-2xl transition-colors border border-white/5 flex items-center gap-4"
     >
       <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onEdit(salary)}>
         <div className="text-[10px] font-bold text-white/40 uppercase tracking-wider mb-0.5">Rendimento Extra</div>
