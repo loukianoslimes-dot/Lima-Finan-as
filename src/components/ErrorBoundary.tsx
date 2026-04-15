@@ -51,8 +51,8 @@ class ErrorBoundary extends React.Component<Props, State> {
       }
 
       return (
-        <div className="min-h-screen bg-[#144a95] flex items-center justify-center p-4">
-          <div className="bg-white/10 backdrop-blur-md p-8 rounded-3xl border border-white/20 shadow-2xl max-w-md w-full text-center space-y-6">
+        <div className="min-h-screen bg-gradient-to-br from-[#144a95] via-[#1a5fb4] to-[#144a95] flex items-center justify-center p-4">
+          <div className="liquid-glass p-8 rounded-3xl max-w-md w-full text-center space-y-6">
             <div className="bg-red-500/20 w-16 h-16 rounded-full flex items-center justify-center mx-auto">
               <AlertCircle className="w-10 h-10 text-red-400" />
             </div>

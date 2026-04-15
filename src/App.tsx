@@ -142,7 +142,7 @@ const DebtorItem: React.FC<DebtorItemProps> = ({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       className={cn(
-        "group bg-white/5 hover:bg-white/10 transition-colors p-4 rounded-2xl border border-white/5 flex items-center justify-between gap-4",
+        "group bg-white/5 hover:bg-white/10 backdrop-blur-md transition-colors p-4 rounded-2xl border border-white/10 flex items-center justify-between gap-4",
         debtor.isReceived && "bg-green-500/20 border-green-500/40 shadow-[0_0_15px_rgba(34,197,94,0.1)]"
       )}
     >
@@ -236,7 +236,7 @@ const ExpenseItem: React.FC<ExpenseItemProps> = ({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       className={cn(
-        "group bg-white/5 hover:bg-white/10 transition-colors p-4 rounded-2xl border border-white/5 flex items-center justify-between gap-4",
+        "group bg-white/5 hover:bg-white/10 backdrop-blur-md transition-colors p-4 rounded-2xl border border-white/10 flex items-center justify-between gap-4",
         expense.isPaid && "bg-green-500/20 border-green-500/40 shadow-[0_0_15px_rgba(34,197,94,0.1)]"
       )}
     >
@@ -1297,6 +1297,61 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
   const totalIncome = salary + secondarySalary + totalAdditionalSalary;
   const balance = totalIncome - totalMonthlyExpenses;
 
+  // Logic for dynamic balance messages
+  const balanceMessage = useMemo(() => {
+    // 1. Calculate previous month's balance for comparison
+    const prevDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
+    const prevYear = prevDate.getFullYear();
+    const prevMonth = String(prevDate.getMonth() + 1).padStart(2, '0');
+    const prevMonthStr = `${prevYear}-${prevMonth}`;
+
+    let prevTotalExpenses = 0;
+    expenses.forEach(expense => {
+      const expenseMonthStr = expense.date.slice(0, 7);
+      if (expense.isFixed) {
+        if (expenseMonthStr <= prevMonthStr) {
+          prevTotalExpenses += expense.value;
+        }
+      } else {
+        if (expenseMonthStr === prevMonthStr) {
+          prevTotalExpenses += expense.value;
+        }
+      }
+    });
+
+    let prevAdditionalSalary = 0;
+    additionalSalaries.forEach(s => {
+      if (s.date.slice(0, 7) === prevMonthStr) {
+        prevAdditionalSalary += s.value;
+      }
+    });
+
+    const prevTotalIncome = salary + secondarySalary + prevAdditionalSalary;
+    const prevBalance = prevTotalIncome - prevTotalExpenses;
+
+    // 2. Apply rules in priority order
+    
+    // Rule: If equal, no message
+    if (balance === prevBalance) {
+      return null;
+    }
+
+    // Rule: If balance is negative (interpreted from "menor que rendimentos" in tough context)
+    // This message takes priority when in debt/negative balance
+    if (balance < 0) {
+      return "Minha fé está além do impossível.";
+    }
+
+    // Rule: Comparison with previous month
+    if (balance > prevBalance) {
+      return "Parabéns, você economizou mais que no último mês.";
+    } else if (balance < prevBalance) {
+      return "Esse deserto vai passar.";
+    }
+
+    return null;
+  }, [balance, totalIncome, expenses, additionalSalaries, currentDate, salary, secondarySalary]);
+
   const totalDebtors = useMemo(() => {
     return filteredDebtors.reduce((acc, curr) => acc + curr.value, 0);
   }, [filteredDebtors]);
@@ -1651,7 +1706,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
             className="flex flex-col items-center justify-center min-h-[80vh] space-y-8 text-center"
           >
             <div className="space-y-4">
-              <div className="bg-white/20 p-4 rounded-3xl backdrop-blur-md inline-block mx-auto relative group max-w-[200px] max-h-[200px]">
+              <div className="liquid-glass p-4 rounded-3xl inline-block mx-auto relative group max-w-[200px] max-h-[200px]">
                 {systemConfig.appIconUrl ? (
                   <img 
                     src={systemConfig.appIconUrl} 
@@ -1693,7 +1748,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
             >
               <div className="flex items-center gap-3">
                 <div className="relative group">
-                  <div className="bg-white/20 p-1 rounded-xl backdrop-blur-md overflow-hidden min-w-[48px] min-h-[48px] max-w-[120px] max-h-[120px] flex items-center justify-center border border-white/20 w-fit h-fit">
+                  <div className="liquid-glass p-1 rounded-xl overflow-hidden min-w-[48px] min-h-[48px] max-w-[120px] max-h-[120px] flex items-center justify-center w-fit h-fit">
                     {userPhotoUrl || systemConfig.appIconUrl ? (
                       <img 
                         src={userPhotoUrl || systemConfig.appIconUrl} 
@@ -1749,7 +1804,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
                   <motion.div 
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
-                    className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/20 shadow-xl flex flex-col cursor-pointer hover:bg-white/15 transition-all min-h-[110px] justify-center"
+                    className="liquid-glass liquid-glass-hover p-4 rounded-2xl flex flex-col cursor-pointer min-h-[110px] justify-center"
                     onClick={() => setIsSalaryModalOpen(true)}
                   >
                     <div className="flex items-center justify-between mb-2">
@@ -1767,7 +1822,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
                   <motion.div 
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
-                    className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/20 shadow-xl flex flex-col cursor-pointer hover:bg-white/15 transition-all min-h-[110px] justify-center"
+                    className="liquid-glass liquid-glass-hover p-4 rounded-2xl flex flex-col cursor-pointer min-h-[110px] justify-center"
                     onClick={() => setIsAdditionalSalaryListModalOpen(true)}
                   >
                     <div className="flex justify-between items-start mb-2">
@@ -1791,7 +1846,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
                 {/* Summary Cards */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.1 }}>
-                    <Card className="bg-white/10 backdrop-blur-md border-white/20 text-white overflow-hidden relative p-4 rounded-2xl h-full shadow-xl">
+                    <Card className="liquid-glass text-white overflow-hidden relative p-4 rounded-2xl h-full">
                       <div className="absolute top-0 right-0 p-2 opacity-10">
                         <ArrowUpCircle className="w-8 h-8" />
                       </div>
@@ -1804,7 +1859,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
                   </motion.div>
 
                   <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.2 }}>
-                    <Card className="bg-white/10 backdrop-blur-md border-white/20 text-white overflow-hidden relative p-4 rounded-2xl h-full shadow-xl">
+                    <Card className="liquid-glass text-white overflow-hidden relative p-4 rounded-2xl h-full">
                       <div className="absolute top-0 right-0 p-2 opacity-10">
                         <ArrowDownCircle className="w-8 h-8" />
                       </div>
@@ -1832,7 +1887,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
                     transition={{ delay: 0.3 }}
                     className="col-span-2 sm:col-span-1"
                   >
-                    <Card className="bg-white/10 backdrop-blur-md border-white/20 text-white overflow-hidden relative p-4 rounded-2xl h-full shadow-xl">
+                    <Card className="liquid-glass text-white overflow-hidden relative p-4 rounded-2xl h-full">
                       <div className="absolute top-0 right-0 p-2 opacity-10">
                         <Wallet className="w-8 h-8" />
                       </div>
@@ -1841,6 +1896,11 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
                         <span className="text-xs opacity-50 font-bold">R$</span>
                         <div className="text-xl font-bold truncate">{formatCurrencyParts(balance).amount}</div>
                       </div>
+                      {balanceMessage && (
+                        <div className="mt-2 text-[10px] text-white/60 italic leading-tight border-t border-white/5 pt-2">
+                          {balanceMessage}
+                        </div>
+                      )}
                     </Card>
                   </motion.div>
                 </div>
@@ -1850,7 +1910,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.35 }}
-                  className="flex items-center justify-center gap-6 bg-white/10 backdrop-blur-md p-6 rounded-3xl border border-white/20 shadow-xl"
+                  className="flex items-center justify-center gap-6 liquid-glass p-6 rounded-3xl"
                 >
                   <Button variant="ghost" size="icon" onClick={() => changeMonth(-1)} className="text-white hover:bg-white/10 h-12 w-12 rounded-2xl">
                     <ChevronLeft className="w-6 h-6" />
@@ -1870,7 +1930,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4 }}
-                className="bg-white/10 backdrop-blur-md rounded-3xl border border-white/20 shadow-2xl overflow-hidden"
+                className="liquid-glass rounded-3xl overflow-hidden"
               >
                 <button 
                   className="w-full p-6 border-b border-white/10 flex justify-between items-center cursor-pointer hover:bg-white/5 transition-colors text-left"
@@ -1931,7 +1991,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.45 }}
-              className="bg-white/10 backdrop-blur-md rounded-3xl border border-white/20 shadow-2xl overflow-hidden"
+              className="liquid-glass rounded-3xl overflow-hidden"
             >
               <button 
                 className="w-full p-6 border-b border-white/10 flex justify-between items-center cursor-pointer hover:bg-white/5 transition-colors text-left"
@@ -2049,7 +2109,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div className="grid grid-cols-2 gap-3 md:col-span-2">
                 <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}>
-                  <Card className="bg-white/10 backdrop-blur-md border-white/20 text-white overflow-hidden relative p-4 rounded-2xl h-full shadow-xl">
+                  <Card className="liquid-glass text-white overflow-hidden relative p-4 rounded-2xl h-full">
                     <div className="absolute top-0 right-0 p-2 opacity-10">
                       <UserIcon className="w-8 h-8" />
                     </div>
@@ -2060,7 +2120,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
                   </Card>
                 </motion.div>
                 <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.1 }}>
-                  <Card className="bg-white/10 backdrop-blur-md border-white/20 text-white overflow-hidden relative p-4 rounded-2xl h-full shadow-xl">
+                  <Card className="liquid-glass text-white overflow-hidden relative p-4 rounded-2xl h-full">
                     <div className="absolute top-0 right-0 p-2 opacity-10">
                       <Check className="w-8 h-8" />
                     </div>
@@ -2074,7 +2134,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
 
               {/* PIX Card */}
               <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.2 }}>
-                <Card className="bg-white/15 backdrop-blur-md border-white/30 text-white overflow-hidden relative p-4 rounded-2xl h-full shadow-xl border-l-4 border-l-blue-400">
+                <Card className="liquid-glass text-white overflow-hidden relative p-4 rounded-2xl h-full border-l-4 border-l-blue-400">
                   <div className="flex justify-between items-center mb-2">
                     <div className="text-[10px] font-bold text-white/70 uppercase tracking-widest">Minha Chave PIX</div>
                     <Button 
@@ -2132,7 +2192,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
             <motion.div 
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="flex items-center justify-center gap-6 bg-white/10 backdrop-blur-md p-6 rounded-3xl border border-white/20 shadow-xl"
+              className="flex items-center justify-center gap-6 liquid-glass p-6 rounded-3xl"
             >
               <Button variant="ghost" size="icon" onClick={() => changeMonth(-1)} className="text-white hover:bg-white/10 h-12 w-12 rounded-2xl">
                 <ChevronLeft className="w-6 h-6" />
@@ -2151,7 +2211,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-white/10 backdrop-blur-md rounded-3xl border border-white/20 shadow-2xl overflow-hidden"
+                className="liquid-glass rounded-3xl overflow-hidden"
               >
                 <div className="p-6 border-b border-white/10 flex justify-between items-center">
                   <h2 className="text-xl font-bold">Devedores Fixos</h2>
@@ -2180,7 +2240,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-white/10 backdrop-blur-md rounded-3xl border border-white/20 shadow-2xl overflow-hidden"
+              className="liquid-glass rounded-3xl overflow-hidden"
             >
               <div className="p-6 border-b border-white/10 flex flex-col gap-4">
                 <div className="flex justify-between items-center">
@@ -2245,7 +2305,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
             className="space-y-6"
           >
             {/* Report Controls */}
-            <div className="bg-white/10 backdrop-blur-md p-6 rounded-3xl border border-white/20 shadow-xl space-y-4">
+            <div className="liquid-glass p-6 rounded-3xl space-y-4">
               <div className="flex items-center gap-2 mb-2">
                 <TrendingUp className="w-5 h-5 text-green-400" />
                 <h2 className="text-xl font-bold">Configuração do Relatório</h2>
@@ -2273,7 +2333,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
             </div>
 
             {/* Monthly Comparison Chart */}
-            <div className="bg-white/10 backdrop-blur-md p-6 rounded-3xl border border-white/20 shadow-xl">
+            <div className="liquid-glass p-6 rounded-3xl">
               <div className="flex items-center gap-2 mb-6">
                 <BarChart3 className="w-5 h-5 text-blue-400" />
                 <h2 className="text-lg font-bold">Comparativo Mensal</h2>
@@ -2310,7 +2370,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Category Breakdown */}
-              <div className="bg-white/10 backdrop-blur-md p-6 rounded-3xl border border-white/20 shadow-xl">
+              <div className="liquid-glass p-6 rounded-3xl">
                 <div className="flex items-center gap-2 mb-6">
                   <PieChart className="w-5 h-5 text-purple-400" />
                   <h2 className="text-lg font-bold">Gastos por Categoria</h2>
@@ -2359,7 +2419,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
               </div>
 
               {/* Additional Salaries Period List */}
-              <div className="bg-white/10 backdrop-blur-md p-6 rounded-3xl border border-white/20 shadow-xl flex flex-col">
+              <div className="liquid-glass p-6 rounded-3xl flex flex-col">
                 <div className="flex items-center gap-2 mb-6">
                   <ArrowUpCircle className="w-5 h-5 text-green-400" />
                   <h2 className="text-lg font-bold">Extras no Período</h2>
@@ -2493,7 +2553,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
 
       {/* Salary Modal */}
       <Dialog open={isSalaryModalOpen} onOpenChange={setIsSalaryModalOpen}>
-        <DialogContent className="bg-[#144a95] border-white/20 text-white w-[95vw] sm:max-w-[425px] rounded-3xl">
+        <DialogContent className="bg-[#144a95]/80 backdrop-blur-xl border-white/20 text-white w-[95vw] sm:max-w-[425px] rounded-3xl">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold flex items-center gap-2">
               <Wallet className="w-6 h-6 text-blue-300" />
@@ -2557,7 +2617,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
 
       {/* Add/Edit Debtor Modal */}
       <Dialog open={isDebtorModalOpen} onOpenChange={setIsDebtorModalOpen}>
-        <DialogContent className="bg-[#144a95] border-white/20 text-white w-[95vw] sm:max-w-[425px] max-h-[90vh] overflow-y-auto rounded-3xl">
+        <DialogContent className="bg-[#144a95]/80 backdrop-blur-xl border-white/20 text-white w-[95vw] sm:max-w-[425px] max-h-[90vh] overflow-y-auto rounded-3xl">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold">
               {editingDebtor ? "Editar Devedor" : "Novo Devedor"}
@@ -2645,7 +2705,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
                     <SelectTrigger id="debtor-frequency" className="bg-white/5 border-white/10 text-white h-11 rounded-xl">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="bg-[#144a95] border-white/20 text-white">
+                    <SelectContent className="bg-[#144a95]/90 backdrop-blur-xl border-white/20 text-white">
                       <SelectItem value="monthly">Mensal</SelectItem>
                       <SelectItem value="yearly">Anual</SelectItem>
                     </SelectContent>
@@ -2697,7 +2757,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
 
       {/* Add/Edit Expense Modal */}
       <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
-        <DialogContent className="bg-[#144a95] border-white/20 text-white w-[95vw] sm:max-w-[425px] max-h-[90vh] overflow-y-auto rounded-3xl">
+        <DialogContent className="bg-[#144a95]/80 backdrop-blur-xl border-white/20 text-white w-[95vw] sm:max-w-[425px] max-h-[90vh] overflow-y-auto rounded-3xl">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold">
               {editingExpense ? "Editar Despesa" : "Nova Despesa"}
@@ -2769,7 +2829,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
                 <SelectTrigger className="bg-white/10 border-white/20 text-white">
                   <SelectValue placeholder="Selecione uma categoria" />
                 </SelectTrigger>
-                <SelectContent className="bg-[#144a95] border-white/20 text-white">
+                <SelectContent className="bg-[#144a95]/90 backdrop-blur-xl border-white/20 text-white">
                   {categories.map((cat) => (
                     <SelectItem key={cat} value={cat} className="focus:bg-white/10 focus:text-white">
                       {cat}
@@ -2831,7 +2891,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
                       <SelectTrigger className="bg-white/10 border-white/20 text-white h-8">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="bg-[#144a95] border-white/20 text-white">
+                      <SelectContent className="bg-[#144a95]/90 backdrop-blur-xl border-white/20 text-white">
                         <SelectItem value="monthly">Mensal</SelectItem>
                         <SelectItem value="yearly">Anual</SelectItem>
                       </SelectContent>
@@ -2874,7 +2934,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
 
       {/* Add/Edit Additional Salary Modal */}
       <Dialog open={isAdditionalSalaryModalOpen} onOpenChange={setIsAdditionalSalaryModalOpen}>
-        <DialogContent className="bg-[#144a95] border-white/20 text-white w-[95vw] sm:max-w-[425px] rounded-3xl">
+        <DialogContent className="bg-[#144a95]/80 backdrop-blur-xl border-white/20 text-white w-[95vw] sm:max-w-[425px] rounded-3xl">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold">
               {editingAdditionalSalary ? "Editar Salário Adicional" : "Novo Salário Adicional"}
@@ -2950,7 +3010,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
 
       {/* Recurring Action Confirmation Modal */}
       <Dialog open={isRecurringActionModalOpen} onOpenChange={setIsRecurringActionModalOpen}>
-        <DialogContent className="bg-[#144a95] border-white/20 text-white w-[95vw] sm:max-w-[400px] rounded-3xl">
+        <DialogContent className="bg-[#144a95]/80 backdrop-blur-xl border-white/20 text-white w-[95vw] sm:max-w-[400px] rounded-3xl">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold">
               {recurringActionType === "edit" ? "Confirmar Alteração" : "Confirmar Exclusão"}
@@ -3004,7 +3064,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
 
       {/* Delete Additional Salary Confirmation Modal */}
       <Dialog open={isDeleteAdditionalSalaryConfirmModalOpen} onOpenChange={setIsDeleteAdditionalSalaryConfirmModalOpen}>
-        <DialogContent className="bg-[#144a95] border-white/20 text-white w-[95vw] sm:max-w-[400px] rounded-3xl">
+        <DialogContent className="bg-[#144a95]/80 backdrop-blur-xl border-white/20 text-white w-[95vw] sm:max-w-[400px] rounded-3xl">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold">Confirmar Exclusão</DialogTitle>
           </DialogHeader>
@@ -3034,7 +3094,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
 
       {/* Additional Salary List Modal */}
       <Dialog open={isAdditionalSalaryListModalOpen} onOpenChange={setIsAdditionalSalaryListModalOpen}>
-        <DialogContent className="bg-[#144a95] border-white/20 text-white w-[95vw] sm:max-w-[450px] rounded-3xl">
+        <DialogContent className="bg-[#144a95]/80 backdrop-blur-xl border-white/20 text-white w-[95vw] sm:max-w-[450px] rounded-3xl">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold flex items-center gap-2">
               <ArrowUpCircle className="w-5 h-5 text-green-400" />
@@ -3088,7 +3148,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
 
       {/* Delete Confirmation Modal */}
       <Dialog open={isDeleteConfirmModalOpen} onOpenChange={setIsDeleteConfirmModalOpen}>
-        <DialogContent className="bg-[#144a95] border-white/20 text-white w-[95vw] sm:max-w-[400px] rounded-3xl">
+        <DialogContent className="bg-[#144a95]/80 backdrop-blur-xl border-white/20 text-white w-[95vw] sm:max-w-[400px] rounded-3xl">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold">Confirmar Exclusão</DialogTitle>
           </DialogHeader>
@@ -3122,7 +3182,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
 
       {/* New Category Modal */}
       <Dialog open={isCategoryModalOpen} onOpenChange={setIsCategoryModalOpen}>
-        <DialogContent className="bg-[#144a95] border-white/20 text-white w-[95vw] sm:max-w-[300px] rounded-3xl">
+        <DialogContent className="bg-[#144a95]/80 backdrop-blur-xl border-white/20 text-white w-[95vw] sm:max-w-[300px] rounded-3xl">
           <DialogHeader>
             <DialogTitle>Nova Categoria</DialogTitle>
           </DialogHeader>
@@ -3148,7 +3208,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
 
       {/* Billing Modal */}
       <Dialog open={isBillingModalOpen} onOpenChange={setIsBillingModalOpen}>
-        <DialogContent className="bg-[#144a95] border-white/20 text-white rounded-3xl w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto p-0">
+        <DialogContent className="bg-[#144a95]/80 backdrop-blur-xl border-white/20 text-white rounded-3xl w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto p-0">
           <div className="p-6">
             <DialogHeader className="mb-6">
               <DialogTitle className="flex items-center gap-2 text-xl">
@@ -3245,7 +3305,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
 
       {/* Share Modal */}
       <Dialog open={isShareModalOpen} onOpenChange={setIsShareModalOpen}>
-        <DialogContent className="bg-[#144a95] border-white/20 text-white rounded-3xl w-[95vw] sm:max-w-md p-0">
+        <DialogContent className="bg-[#144a95]/80 backdrop-blur-xl border-white/20 text-white rounded-3xl w-[95vw] sm:max-w-md p-0">
           <div className="p-6">
             <DialogHeader className="mb-6">
               <DialogTitle className="flex items-center gap-2 text-xl">
