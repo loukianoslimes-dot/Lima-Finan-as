@@ -1902,13 +1902,6 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
                         {!isTitheEnabled && <span className="text-[7px] sm:text-[8px] text-white/30 uppercase font-bold">Off</span>}
                       </div>
                       <div className="flex items-center gap-1 sm:gap-2">
-                        {isTitheEnabled && (
-                          <Checkbox 
-                            checked={isTithePaid}
-                            onCheckedChange={handleToggleTithePaid}
-                            className="h-4 w-4 sm:h-5 sm:w-5 border-white/30 data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
-                          />
-                        )}
                         <button 
                           onClick={handleToggleTithe}
                           className={cn(
@@ -2645,7 +2638,10 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
 
       {/* Salary Modal */}
       <Dialog open={isSalaryModalOpen} onOpenChange={setIsSalaryModalOpen}>
-        <DialogContent className="bg-white/10 backdrop-blur-2xl border-white/10 text-white w-[95vw] sm:max-w-[425px] rounded-3xl">
+        <DialogContent 
+          className="bg-white/10 backdrop-blur-2xl border-white/10 text-white w-[95vw] sm:max-w-[425px] rounded-3xl"
+        >
+          <div tabIndex={0} className="sr-only" aria-hidden="true" />
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold flex items-center gap-2">
               <Wallet className="w-6 h-6 text-blue-300" />
