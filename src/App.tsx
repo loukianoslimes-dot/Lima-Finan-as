@@ -1373,7 +1373,12 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
     });
 
     const prevTotalIncome = salary + secondarySalary + prevAdditionalSalary;
-    const prevBalance = prevTotalIncome - prevTotalExpenses;
+    
+    // Include tithe in previous month expenses if enabled
+    const prevTitheValue = isTitheEnabled ? prevTotalIncome * 0.1 : 0;
+    const prevTotalExpensesWithTithe = prevTotalExpenses + prevTitheValue;
+    
+    const prevBalance = prevTotalIncome - prevTotalExpensesWithTithe;
 
     // 2. Apply rules in priority order
     
@@ -1715,9 +1720,9 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
   }, [expenses, additionalSalaries, salary, reportRange]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#144a95] to-[#628cc0] text-white p-4 md:p-8 font-sans overflow-x-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-[#010409] to-[#04142c] text-white p-4 md:p-8 font-sans overflow-x-hidden">
       {/* Zoom Controls */}
-      <div className="fixed bottom-24 right-6 flex flex-col gap-2 z-50">
+      <div className="fixed bottom-24 right-6 flex flex-col gap-2 z-30">
         <Button
           size="icon"
           className="h-10 w-10 rounded-full bg-white/10 backdrop-blur-xl border border-white/10 text-white shadow-2xl hover:bg-white/20"
@@ -1735,7 +1740,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
       </div>
 
       <div 
-        className="max-w-3xl mx-auto w-full space-y-6 pb-24"
+        className="max-w-3xl mx-auto w-full space-y-6 pb-24 pt-24"
         style={{ zoom: zoomLevel } as React.CSSProperties}
       >
         {/* Auth Loading State */}
@@ -1772,7 +1777,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
             
             <Button 
               onClick={signInWithGoogle}
-              className="bg-white text-[#144a95] hover:bg-white/90 font-bold px-8 py-6 rounded-2xl text-lg shadow-2xl flex items-center gap-3 transition-all hover:scale-105"
+              className="bg-white text-[#04142c] hover:bg-white/90 font-bold px-8 py-6 rounded-2xl text-lg shadow-2xl flex items-center gap-3 transition-all hover:scale-105"
             >
               <LogIn className="w-6 h-6" />
               Entrar com Google
@@ -1846,99 +1851,102 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
 
             {activeTab === "home" ? (
               <>
-                <div className="grid grid-cols-3 gap-2 sm:gap-3">
-                  <motion.div 
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="liquid-glass liquid-glass-hover p-3 sm:p-4 rounded-2xl flex flex-col cursor-pointer min-h-[110px] justify-center"
-                    onClick={() => setIsSalaryModalOpen(true)}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <Label className="text-white/70 text-[8px] sm:text-[10px] uppercase font-bold block tracking-widest cursor-pointer">Salários</Label>
-                      {isSavingSalary && (
-                        <div className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                      )}
-                    </div>
-                    <div className="flex items-baseline gap-1 sm:gap-2 overflow-hidden">
-                      <span className="text-white/50 text-xs sm:text-lg font-bold shrink-0">R$</span>
-                      <span className="text-sm sm:text-2xl font-bold text-white truncate">{(salary + secondarySalary).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                    </div>
-                  </motion.div>
-
-                  <motion.div 
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="liquid-glass liquid-glass-hover p-3 sm:p-4 rounded-2xl flex flex-col cursor-pointer min-h-[110px] justify-center"
-                    onClick={() => setIsAdditionalSalaryListModalOpen(true)}
-                  >
-                    <div className="flex justify-between items-start mb-2">
-                      <Label className="text-white/70 text-[8px] sm:text-[10px] uppercase font-bold block tracking-widest cursor-pointer">Extras</Label>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        onClick={(e) => { e.stopPropagation(); resetAdditionalSalaryForm(); setIsAdditionalSalaryModalOpen(true); }}
-                        className="h-5 w-5 sm:h-6 sm:w-6 rounded-full bg-white/10 text-white hover:bg-white/20"
-                      >
-                        <Plus className="w-3 h-3" />
-                      </Button>
-                    </div>
-                    <div className="flex items-baseline gap-1 sm:gap-2 overflow-hidden">
-                      <span className="text-white/50 text-xs sm:text-lg font-bold shrink-0">R$</span>
-                      <span className="text-sm sm:text-2xl font-bold text-white truncate">{totalAdditionalSalary.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                    </div>
-                  </motion.div>
-
-                  <motion.div 
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className={cn(
-                      "liquid-glass p-3 sm:p-4 rounded-2xl flex flex-col min-h-[110px] justify-center transition-all duration-300",
-                      !isTitheEnabled && "opacity-60"
-                    )}
-                  >
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="flex flex-col">
-                        <Label className="text-white/70 text-[8px] sm:text-[10px] uppercase font-bold block tracking-widest">Dízimo</Label>
-                        {!isTitheEnabled && <span className="text-[7px] sm:text-[8px] text-white/30 uppercase font-bold">Off</span>}
-                      </div>
-                      <div className="flex items-center gap-1 sm:gap-2">
-                        <button 
-                          onClick={handleToggleTithe}
-                          className={cn(
-                            "w-8 h-4 sm:w-10 sm:h-5 rounded-full relative transition-colors duration-200",
-                            isTitheEnabled ? "bg-blue-500" : "bg-white/10"
-                          )}
-                        >
-                          <motion.div 
-                            animate={{ x: isTitheEnabled ? (typeof window !== 'undefined' && window.innerWidth < 640 ? 16 : 20) : 2 }}
-                            className="w-3 h-3 sm:w-4 sm:h-4 bg-white rounded-full absolute top-0.5"
-                          />
-                        </button>
-                      </div>
-                    </div>
-                    <div className="flex items-baseline gap-1 sm:gap-2 overflow-hidden">
-                      <span className="text-white/50 text-xs sm:text-lg font-bold shrink-0">R$</span>
-                      <span className={cn(
-                        "text-sm sm:text-2xl font-bold truncate",
-                        isTitheEnabled ? (isTithePaid ? "text-green-300" : "text-red-300") : "text-white/40"
-                      )}>
-                        {titheValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                  </motion.div>
-                </div>
+                <div className="space-y-6">
 
                 {/* Summary Cards */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                   <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.1 }}>
-                    <Card className="liquid-glass text-white overflow-hidden relative p-4 rounded-2xl h-full">
+                    <Card className="liquid-glass text-white overflow-hidden relative p-4 rounded-2xl h-full flex flex-col justify-between">
                       <div className="absolute top-0 right-0 p-2 opacity-10">
                         <ArrowUpCircle className="w-8 h-8" />
                       </div>
-                      <div className="text-[10px] font-bold text-white/70 uppercase mb-1 tracking-widest">Rendimentos</div>
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-[10px] opacity-50 font-bold">R$</span>
-                        <div className="text-lg sm:text-xl font-bold truncate">{formatCurrencyParts(totalIncome).amount}</div>
+                      <div>
+                        <div className="text-[10px] font-bold text-white/70 uppercase mb-1 tracking-widest">Rendimentos</div>
+                        <div className="flex items-baseline gap-1 mb-2">
+                          <span className="text-[10px] opacity-50 font-bold">R$</span>
+                          <div className="text-lg sm:text-xl font-bold truncate">{formatCurrencyParts(totalIncome).amount}</div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex flex-col gap-1 border-t border-white/5 pt-2">
+                        <div 
+                          className="flex justify-between items-center text-[10px] sm:text-[12px] uppercase tracking-tight cursor-pointer hover:bg-white/10 p-1.5 rounded-lg transition-all group"
+                          onClick={() => setIsSalaryModalOpen(true)}
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-white/40 group-hover:text-white/70 transition-colors">Salários:</span>
+                            {isSavingSalary && (
+                              <div className="w-2.5 h-2.5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                            )}
+                          </div>
+                          <span className="text-white/60 font-bold group-hover:text-white transition-colors">{formatCurrency(salary + secondarySalary)}</span>
+                        </div>
+                        <div 
+                          className="flex justify-between items-center text-[10px] sm:text-[12px] uppercase tracking-tight cursor-pointer hover:bg-white/10 p-1.5 rounded-lg transition-all group"
+                          onClick={() => setIsAdditionalSalaryListModalOpen(true)}
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-white/40 group-hover:text-white/70 transition-colors">Extras:</span>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={(e) => { e.stopPropagation(); resetAdditionalSalaryForm(); setIsAdditionalSalaryModalOpen(true); }}
+                              className="h-4 w-4 rounded-full bg-white/10 text-white hover:bg-white/20 ml-1"
+                            >
+                              <Plus className="w-2.5 h-2.5" />
+                            </Button>
+                          </div>
+                          <span className="text-white/60 font-bold group-hover:text-white transition-colors">{formatCurrency(totalAdditionalSalary)}</span>
+                        </div>
+                      </div>
+                    </Card>
+                  </motion.div>
+
+                  <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.15 }}>
+                    <Card 
+                      className={cn(
+                        "liquid-glass text-white overflow-hidden relative p-4 rounded-2xl h-full flex flex-col justify-between transition-all duration-300 cursor-pointer",
+                        !isTitheEnabled && "opacity-60"
+                      )}
+                      onClick={() => isTitheEnabled && handleToggleTithePaid()}
+                    >
+                      <div className="flex justify-between items-start mb-2 relative z-10">
+                        <div className="flex flex-col">
+                          <div className="text-[10px] font-bold text-white/70 uppercase tracking-widest flex items-center gap-2">
+                            Dízimo
+                            {!isTitheEnabled && <span className="text-[8px] text-white/30 uppercase font-bold">Off</span>}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 sm:gap-2">
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); handleToggleTithe(); }}
+                            className={cn(
+                              "w-8 h-4 sm:w-10 sm:h-5 rounded-full relative transition-colors duration-200",
+                              isTitheEnabled ? "bg-blue-500" : "bg-white/10"
+                            )}
+                          >
+                            <motion.div 
+                              animate={{ x: isTitheEnabled ? (typeof window !== 'undefined' && window.innerWidth < 640 ? 16 : 20) : 2 }}
+                              className="w-3 h-3 sm:w-4 sm:h-4 bg-white rounded-full absolute top-0.5"
+                            />
+                          </button>
+                        </div>
+                      </div>
+                      <div>
+                        <div className="flex items-baseline gap-1 overflow-hidden">
+                          <span className="text-[10px] opacity-50 font-bold">R$</span>
+                          <div className={cn(
+                            "text-lg sm:text-xl font-bold truncate",
+                            isTitheEnabled ? (isTithePaid ? "text-green-300" : "text-red-300") : "text-white/40"
+                          )}>
+                            {titheValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </div>
+                        </div>
+                        {isTitheEnabled && (
+                          <div className="mt-2 text-[9px] uppercase font-bold tracking-tighter opacity-40">
+                            {isTithePaid ? "✓ Pago" : "○ Pendente"}
+                          </div>
+                        )}
                       </div>
                     </Card>
                   </motion.div>
@@ -1970,7 +1978,6 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
                     initial={{ opacity: 0, scale: 0.9 }} 
                     animate={{ opacity: 1, scale: 1 }} 
                     transition={{ delay: 0.3 }}
-                    className="col-span-2 sm:col-span-1"
                   >
                     <Card className="liquid-glass text-white overflow-hidden relative p-4 rounded-2xl h-full">
                       <div className="absolute top-0 right-0 p-2 opacity-10">
@@ -1981,6 +1988,26 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
                         <span className="text-xs opacity-50 font-bold">R$</span>
                         <div className="text-xl font-bold truncate">{formatCurrencyParts(balance).amount}</div>
                       </div>
+
+                      {/* Savings Progress Bar */}
+                      <div className="mt-4 space-y-1.5">
+                        <div className="flex justify-between items-center text-[8px] uppercase font-bold tracking-widest text-white/30">
+                          <span>Eficiência Financeira</span>
+                          <span>{totalIncome > 0 ? Math.max(0, Math.round((balance / totalIncome) * 100)) : 0}%</span>
+                        </div>
+                        <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
+                          <motion.div 
+                            initial={{ width: 0 }}
+                            animate={{ 
+                              width: `${totalIncome > 0 ? Math.max(0, Math.min(100, (balance / totalIncome) * 100)) : 0}%`,
+                              backgroundColor: balance >= 0 ? "rgba(96, 165, 250, 0.8)" : "rgba(248, 113, 113, 0.5)"
+                            }}
+                            transition={{ type: "spring", stiffness: 50, damping: 20 }}
+                            className="h-full rounded-full shadow-[0_0_10px_rgba(59,130,246,0.3)]"
+                          />
+                        </div>
+                      </div>
+
                       {balanceMessage && (
                         <div className="mt-2 text-[10px] text-white/60 italic leading-tight border-t border-white/5 pt-2">
                           {balanceMessage}
@@ -1990,24 +2017,6 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
                   </motion.div>
                 </div>
 
-                {/* Month Selector */}
-                <motion.div 
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.35 }}
-                  className="flex items-center justify-center gap-6 liquid-glass p-6 rounded-3xl"
-                >
-                  <Button variant="ghost" size="icon" onClick={() => changeMonth(-1)} className="text-white hover:bg-white/10 h-12 w-12 rounded-2xl">
-                    <ChevronLeft className="w-6 h-6" />
-                  </Button>
-                  <div className="text-center min-w-[160px]">
-                    <div className="text-xs uppercase font-bold text-white/50 tracking-widest mb-1">{year}</div>
-                    <div className="text-2xl font-bold capitalize">{monthName}</div>
-                  </div>
-                  <Button variant="ghost" size="icon" onClick={() => changeMonth(1)} className="text-white hover:bg-white/10 h-12 w-12 rounded-2xl">
-                    <ChevronRight className="w-6 h-6" />
-                  </Button>
-                </motion.div>
 
             {/* Fixed Expenses Card */}
             {fixedExpenses.length > 0 && (
@@ -2183,6 +2192,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
                 )}
               </AnimatePresence>
             </motion.div>
+          </div>
           </>
         ) : activeTab === "debtors" ? (
           <motion.div 
@@ -2273,23 +2283,6 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
               </motion.div>
             </div>
 
-            {/* Month Selector */}
-            <motion.div 
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex items-center justify-center gap-6 liquid-glass p-6 rounded-3xl"
-            >
-              <Button variant="ghost" size="icon" onClick={() => changeMonth(-1)} className="text-white hover:bg-white/10 h-12 w-12 rounded-2xl">
-                <ChevronLeft className="w-6 h-6" />
-              </Button>
-              <div className="text-center min-w-[160px]">
-                <div className="text-xs uppercase font-bold text-white/50 tracking-widest mb-1">{year}</div>
-                <div className="text-2xl font-bold capitalize">{monthName}</div>
-              </div>
-              <Button variant="ghost" size="icon" onClick={() => changeMonth(1)} className="text-white hover:bg-white/10 h-12 w-12 rounded-2xl">
-                <ChevronRight className="w-6 h-6" />
-              </Button>
-            </motion.div>
 
             {/* Fixed Debtors Card */}
             {fixedDebtors.length > 0 && (
@@ -2442,7 +2435,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
                       tickFormatter={(value) => `R$ ${value}`}
                     />
                     <Tooltip 
-                      contentStyle={{ backgroundColor: '#144a95', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '12px' }}
+                      contentStyle={{ backgroundColor: '#04142c', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '12px' }}
                       itemStyle={{ fontSize: '12px' }}
                     />
                     <Legend wrapperStyle={{ paddingTop: '20px', fontSize: '10px' }} />
@@ -2477,7 +2470,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
                         ))}
                       </Pie>
                       <Tooltip 
-                        contentStyle={{ backgroundColor: '#144a95', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '12px' }}
+                        contentStyle={{ backgroundColor: '#04142c', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '12px' }}
                         itemStyle={{ fontSize: '12px' }}
                       />
                     </RePieChart>
@@ -2565,6 +2558,42 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
           </div>
         )}
 
+        {/* Top Month Selector */}
+        {user && (activeTab === "home" || activeTab === "debtors") && (
+          <div className="fixed top-0 left-0 right-0 p-4 flex justify-center z-40">
+            <motion.div 
+              initial={{ y: -20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              className="bg-white/10 backdrop-blur-2xl border border-white/20 rounded-full p-2 flex items-center justify-between gap-2 shadow-2xl min-w-[200px] sm:min-w-[260px]"
+            >
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => changeMonth(-1)} 
+                className="text-white hover:bg-white/10 h-12 w-12 rounded-full transition-all active:scale-95"
+                title="Mês Anterior"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </Button>
+              
+              <div className="text-center min-w-[80px] sm:min-w-[120px]">
+                <div className="text-[10px] uppercase font-bold text-white/50 tracking-widest leading-none mb-0.5">{year}</div>
+                <div className="text-lg font-bold capitalize leading-none">{monthName}</div>
+              </div>
+              
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => changeMonth(1)} 
+                className="text-white hover:bg-white/10 h-12 w-12 rounded-full transition-all active:scale-95"
+                title="Próximo Mês"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </Button>
+            </motion.div>
+          </div>
+        )}
+
         {/* Navigation Bar (Mobile Friendly) */}
         {user && (
           <div className="fixed bottom-0 left-0 right-0 p-4 flex justify-center z-40">
@@ -2573,7 +2602,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
                 variant="ghost" 
                 size="icon" 
                 onClick={() => setActiveTab("home")}
-                className={cn("w-12 h-12 rounded-full transition-all", activeTab === "home" ? "bg-white text-[#144a95]" : "text-white/60")}
+                className={cn("w-12 h-12 rounded-full transition-all", activeTab === "home" ? "bg-white text-[#04142c]" : "text-white/60")}
                 title="Início"
               >
                 <Home className="w-6 h-6" />
@@ -2583,7 +2612,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
                 variant="ghost" 
                 size="icon" 
                 onClick={() => setActiveTab("debtors")}
-                className={cn("w-12 h-12 rounded-full transition-all", activeTab === "debtors" ? "bg-white text-[#144a95]" : "text-white/60")}
+                className={cn("w-12 h-12 rounded-full transition-all", activeTab === "debtors" ? "bg-white text-[#04142c]" : "text-white/60")}
                 title="Devedores"
               >
                 <UserIcon className="w-6 h-6" />
@@ -2593,7 +2622,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
                 variant="ghost" 
                 size="icon" 
                 onClick={() => setActiveTab("report")}
-                className={cn("w-12 h-12 rounded-full transition-all", activeTab === "report" ? "bg-white text-[#144a95]" : "text-white/60")}
+                className={cn("w-12 h-12 rounded-full transition-all", activeTab === "report" ? "bg-white text-[#04142c]" : "text-white/60")}
                 title="Relatório"
               >
                 <BarChart3 className="w-6 h-6" />
@@ -3012,7 +3041,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
             <Button 
               onClick={handleAddExpense}
               disabled={isSaving}
-              className="w-full bg-white text-[#144a95] hover:bg-white/90 font-bold"
+              className="w-full bg-white text-[#04142c] hover:bg-white/90 font-bold"
             >
               {isSaving ? "Salvando..." : (editingExpense ? "Efetivar Alteração" : "Efetivar Despesa")}
             </Button>
@@ -3088,7 +3117,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
             <Button 
               onClick={handleAddAdditionalSalary}
               disabled={isSaving}
-              className="flex-1 bg-white text-[#144a95] hover:bg-white/90 font-bold"
+              className="flex-1 bg-white text-[#04142c] hover:bg-white/90 font-bold"
             >
               {isSaving ? "Salvando..." : "Salvar"}
             </Button>
@@ -3286,7 +3315,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
           <DialogFooter>
             <Button 
               onClick={handleAddCategory}
-              className="w-full bg-white text-[#144a95] hover:bg-white/90"
+              className="w-full bg-white text-[#04142c] hover:bg-white/90"
             >
               Adicionar
             </Button>
@@ -3348,7 +3377,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
                     <div className="flex flex-col gap-2 pt-2">
                       <Button 
                         onClick={copyBillingToClipboard}
-                        className="w-full bg-white text-[#144a95] hover:bg-white/90 font-bold gap-2 h-12"
+                        className="w-full bg-white text-[#04142c] hover:bg-white/90 font-bold gap-2 h-12"
                       >
                         {billingCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                         {billingCopied ? "Copiado" : "Copiar Texto"}
@@ -3442,7 +3471,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
             <div className="mt-6">
               <Button 
                 onClick={() => setIsShareModalOpen(false)}
-                className="w-full bg-white text-[#144a95] hover:bg-white/90 font-bold py-6 rounded-2xl"
+                className="w-full bg-white text-[#04142c] hover:bg-white/90 font-bold py-6 rounded-2xl"
               >
                 Fechar
               </Button>
