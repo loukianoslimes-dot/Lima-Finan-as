@@ -384,6 +384,8 @@ export default function App() {
 
   const [salary, setSalary] = useState<number>(0);
   const [secondarySalary, setSecondarySalary] = useState<number>(0);
+  const [isTitheEnabled, setIsTitheEnabled] = useState(false);
+  const [tithePaidMonths, setTithePaidMonths] = useState<string[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [debtors, setDebtors] = useState<Debtor[]>([]);
   const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
@@ -566,6 +568,9 @@ export default function App() {
       setExpenses([]);
       setAdditionalSalaries([]);
       setSalary(0);
+      setSecondarySalary(0);
+      setIsTitheEnabled(false);
+      setTithePaidMonths([]);
       return;
     }
 
@@ -588,12 +593,17 @@ export default function App() {
         const data = docSnap.data();
         const cloudSalary = data.salary || 0;
         const cloudSecondarySalary = data.secondarySalary || 0;
+        const cloudIsTitheEnabled = data.isTitheEnabled || false;
+        const cloudTithePaidMonths = data.tithePaidMonths || [];
         
         if (data.photoURL) {
           setUserPhotoUrl(data.photoURL);
         } else if (user.photoURL) {
           setUserPhotoUrl(user.photoURL);
         }
+
+        setIsTitheEnabled(cloudIsTitheEnabled);
+        setTithePaidMonths(cloudTithePaidMonths);
 
         setSalary(prev => {
           if (prev !== cloudSalary && !isSavingSalary) {
@@ -746,6 +756,30 @@ export default function App() {
     }, 1000);
     
     setSalaryTimeout(timeout);
+  };
+
+  const handleToggleTithe = async () => {
+    if (!user) return;
+    const path = `users/${user.uid}/settings/main`;
+    try {
+      await setDoc(doc(db, path), { isTitheEnabled: !isTitheEnabled }, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, path);
+    }
+  };
+
+  const handleToggleTithePaid = async () => {
+    if (!user) return;
+    const currentMonthStr = currentDate.toISOString().slice(0, 7);
+    const path = `users/${user.uid}/settings/main`;
+    try {
+      const newPaidMonths = isTithePaid
+        ? tithePaidMonths.filter(m => m !== currentMonthStr)
+        : [...tithePaidMonths, currentMonthStr];
+      await setDoc(doc(db, path), { tithePaidMonths: newPaidMonths }, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, path);
+    }
   };
 
   const APP_URL = "https://limafinancas.netlify.app";
@@ -1283,18 +1317,30 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
     setDisplayAdditionalSalaries(sortedAll);
   }, [additionalSalaries]);
 
-  const { totalMonthlyExpenses, totalPaidExpenses, totalRemainingExpenses } = useMemo(() => {
-    const total = filteredExpenses.reduce((acc, curr) => acc + curr.value, 0);
-    const paid = filteredExpenses.filter(e => e.isPaid).reduce((acc, curr) => acc + curr.value, 0);
-    const remaining = total - paid;
-    return { totalMonthlyExpenses: total, totalPaidExpenses: paid, totalRemainingExpenses: remaining };
-  }, [filteredExpenses]);
-
   const totalAdditionalSalary = useMemo(() => {
     return filteredAdditionalSalaries.reduce((acc, curr) => acc + curr.value, 0);
   }, [filteredAdditionalSalaries]);
 
   const totalIncome = salary + secondarySalary + totalAdditionalSalary;
+
+  const { totalMonthlyExpenses, totalPaidExpenses, totalRemainingExpenses, titheValue, isTithePaid } = useMemo(() => {
+    const currentMonthStr = currentDate.toISOString().slice(0, 7);
+    const titheVal = totalIncome * 0.1;
+    const tithePaid = tithePaidMonths.includes(currentMonthStr);
+
+    const titheToInclude = isTitheEnabled ? titheVal : 0;
+    const total = filteredExpenses.reduce((acc, curr) => acc + curr.value, 0) + titheToInclude;
+    const paid = filteredExpenses.filter(e => e.isPaid).reduce((acc, curr) => acc + curr.value, 0) + (isTitheEnabled && tithePaid ? titheVal : 0);
+    const remaining = total - paid;
+    return { 
+      totalMonthlyExpenses: total, 
+      totalPaidExpenses: paid, 
+      totalRemainingExpenses: remaining,
+      titheValue: titheVal,
+      isTithePaid: tithePaid
+    };
+  }, [filteredExpenses, isTitheEnabled, totalIncome, tithePaidMonths, currentDate]);
+
   const balance = totalIncome - totalMonthlyExpenses;
 
   // Logic for dynamic balance messages
@@ -1800,45 +1846,91 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
 
             {activeTab === "home" ? (
               <>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-2 sm:gap-3">
                   <motion.div 
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className="liquid-glass liquid-glass-hover p-4 rounded-2xl flex flex-col cursor-pointer min-h-[110px] justify-center"
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="liquid-glass liquid-glass-hover p-3 sm:p-4 rounded-2xl flex flex-col cursor-pointer min-h-[110px] justify-center"
                     onClick={() => setIsSalaryModalOpen(true)}
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <Label className="text-white/70 text-[10px] uppercase font-bold block tracking-widest cursor-pointer">Meus Salários</Label>
+                      <Label className="text-white/70 text-[8px] sm:text-[10px] uppercase font-bold block tracking-widest cursor-pointer">Salários</Label>
                       {isSavingSalary && (
                         <div className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin" />
                       )}
                     </div>
-                    <div className="flex items-baseline gap-2 overflow-hidden">
-                      <span className="text-white/50 text-lg font-bold shrink-0">R$</span>
-                      <span className="text-2xl font-bold text-white truncate">{(salary + secondarySalary).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    <div className="flex items-baseline gap-1 sm:gap-2 overflow-hidden">
+                      <span className="text-white/50 text-xs sm:text-lg font-bold shrink-0">R$</span>
+                      <span className="text-sm sm:text-2xl font-bold text-white truncate">{(salary + secondarySalary).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                     </div>
                   </motion.div>
 
                   <motion.div 
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className="liquid-glass liquid-glass-hover p-4 rounded-2xl flex flex-col cursor-pointer min-h-[110px] justify-center"
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="liquid-glass liquid-glass-hover p-3 sm:p-4 rounded-2xl flex flex-col cursor-pointer min-h-[110px] justify-center"
                     onClick={() => setIsAdditionalSalaryListModalOpen(true)}
                   >
                     <div className="flex justify-between items-start mb-2">
-                      <Label className="text-white/70 text-[10px] uppercase font-bold block tracking-widest cursor-pointer">Extras</Label>
+                      <Label className="text-white/70 text-[8px] sm:text-[10px] uppercase font-bold block tracking-widest cursor-pointer">Extras</Label>
                       <Button 
                         variant="ghost" 
                         size="icon" 
                         onClick={(e) => { e.stopPropagation(); resetAdditionalSalaryForm(); setIsAdditionalSalaryModalOpen(true); }}
-                        className="h-6 w-6 rounded-full bg-white/10 text-white hover:bg-white/20"
+                        className="h-5 w-5 sm:h-6 sm:w-6 rounded-full bg-white/10 text-white hover:bg-white/20"
                       >
                         <Plus className="w-3 h-3" />
                       </Button>
                     </div>
-                    <div className="flex items-baseline gap-2 overflow-hidden">
-                      <span className="text-white/50 text-lg font-bold shrink-0">R$</span>
-                      <span className="text-2xl font-bold text-white truncate">{totalAdditionalSalary.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    <div className="flex items-baseline gap-1 sm:gap-2 overflow-hidden">
+                      <span className="text-white/50 text-xs sm:text-lg font-bold shrink-0">R$</span>
+                      <span className="text-sm sm:text-2xl font-bold text-white truncate">{totalAdditionalSalary.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  </motion.div>
+
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className={cn(
+                      "liquid-glass p-3 sm:p-4 rounded-2xl flex flex-col min-h-[110px] justify-center transition-all duration-300",
+                      !isTitheEnabled && "opacity-60"
+                    )}
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="flex flex-col">
+                        <Label className="text-white/70 text-[8px] sm:text-[10px] uppercase font-bold block tracking-widest">Dízimo</Label>
+                        {!isTitheEnabled && <span className="text-[7px] sm:text-[8px] text-white/30 uppercase font-bold">Off</span>}
+                      </div>
+                      <div className="flex items-center gap-1 sm:gap-2">
+                        {isTitheEnabled && (
+                          <Checkbox 
+                            checked={isTithePaid}
+                            onCheckedChange={handleToggleTithePaid}
+                            className="h-4 w-4 sm:h-5 sm:w-5 border-white/30 data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
+                          />
+                        )}
+                        <button 
+                          onClick={handleToggleTithe}
+                          className={cn(
+                            "w-8 h-4 sm:w-10 sm:h-5 rounded-full relative transition-colors duration-200",
+                            isTitheEnabled ? "bg-blue-500" : "bg-white/10"
+                          )}
+                        >
+                          <motion.div 
+                            animate={{ x: isTitheEnabled ? (typeof window !== 'undefined' && window.innerWidth < 640 ? 16 : 20) : 2 }}
+                            className="w-3 h-3 sm:w-4 sm:h-4 bg-white rounded-full absolute top-0.5"
+                          />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex items-baseline gap-1 sm:gap-2 overflow-hidden">
+                      <span className="text-white/50 text-xs sm:text-lg font-bold shrink-0">R$</span>
+                      <span className={cn(
+                        "text-sm sm:text-2xl font-bold truncate",
+                        isTitheEnabled ? (isTithePaid ? "text-green-300" : "text-red-300") : "text-white/40"
+                      )}>
+                        {titheValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
                     </div>
                   </motion.div>
                 </div>
