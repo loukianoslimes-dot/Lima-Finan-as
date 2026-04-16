@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Plus, Trash2, Edit2, Wallet, ArrowUpCircle, ArrowDownCircle, ChevronLeft, ChevronRight, ChevronDown, Calendar as CalendarIcon, BarChart3, Home, PieChart, TrendingUp, LogOut, LogIn, AlertCircle, GripVertical, Share2, Copy, Check, Download, Camera, User as UserIcon } from "lucide-react";
+import { Plus, Trash2, Edit2, Wallet, ArrowUpCircle, ArrowDownCircle, ChevronLeft, ChevronRight, ChevronDown, Calendar as CalendarIcon, BarChart3, Home, PieChart, TrendingUp, LogOut, LogIn, AlertCircle, GripVertical, Share2, Copy, Check, Download, Camera, Target, User as UserIcon } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   BarChart, 
@@ -433,6 +433,7 @@ export default function App() {
   const [newCategory, setNewCategory] = useState("");
   const [isFixedExpensesExpanded, setIsFixedExpensesExpanded] = useState(false);
   const [isVariableExpensesExpanded, setIsVariableExpensesExpanded] = useState(false);
+  const [isEfficiencyExpanded, setIsEfficiencyExpanded] = useState(false);
 
   const [userPhotoUrl, setUserPhotoUrl] = useState<string | null>(null);
   const APP_VERSION = "1.0.5"; // Increment this to track updates
@@ -1688,11 +1689,16 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
       const mAdditional = additionalSalaries.filter(s => s.date.slice(0, 7) === mStr)
         .reduce((acc, curr) => acc + curr.value, 0);
 
+      const monthTotalIncome = salary + secondarySalary + mAdditional;
+      const monthBalance = monthTotalIncome - mExpenses;
+      const monthEfficiency = monthTotalIncome > 0 ? Math.max(0, Math.round((monthBalance / monthTotalIncome) * 100)) : 0;
+
       monthlyData.push({
         name: mLabel,
         despesas: mExpenses,
-        rendimentos: salary + secondarySalary + mAdditional,
-        extra: mAdditional
+        rendimentos: monthTotalIncome,
+        extra: mAdditional,
+        efficiency: monthEfficiency
       });
 
       tempDate.setMonth(tempDate.getMonth() + 1);
@@ -2443,6 +2449,132 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
                     <Bar dataKey="despesas" name="Despesas" fill="#f87171" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Efficiency Overview Period */}
+            <div 
+              className="liquid-glass p-6 rounded-3xl cursor-pointer transition-all hover:bg-white/5 group"
+              onClick={() => setIsEfficiencyExpanded(!isEfficiencyExpanded)}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-2">
+                  <Target className="w-5 h-5 text-blue-400" />
+                  <h2 className="text-lg font-bold">Eficiência Financeira</h2>
+                </div>
+                <motion.div
+                  animate={{ rotate: isEfficiencyExpanded ? 180 : 0 }}
+                  className="text-white/40 group-hover:text-white/70"
+                >
+                  <ChevronDown className="w-5 h-5" />
+                </motion.div>
+              </div>
+
+              <div className="space-y-6">
+                {!isEfficiencyExpanded ? (
+                  /* Summary View: Current vs Previous */
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {(() => {
+                      const latest = reportData.monthlyData[reportData.monthlyData.length - 1];
+                      const previous = reportData.monthlyData[reportData.monthlyData.length - 2];
+                      
+                      return (
+                        <>
+                          {latest && (
+                            <div className="space-y-2">
+                              <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-white/40">
+                                <span>{latest.name} (Atual)</span>
+                                <span>{latest.efficiency}%</span>
+                              </div>
+                              <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
+                                <motion.div 
+                                  initial={{ width: 0 }}
+                                  animate={{ width: `${latest.efficiency}%` }}
+                                  className={cn(
+                                    "h-full rounded-full transition-all duration-1000",
+                                    latest.efficiency > 50 ? "bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.3)]" : 
+                                    latest.efficiency > 20 ? "bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.3)]" : 
+                                    "bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.3)]"
+                                  )}
+                                />
+                              </div>
+                            </div>
+                          )}
+                          {previous && (
+                            <div className="space-y-2">
+                              <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-white/40">
+                                <span>{previous.name} (Anterior)</span>
+                                <span>{previous.efficiency}%</span>
+                              </div>
+                              <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
+                                <motion.div 
+                                  initial={{ width: 0 }}
+                                  animate={{ width: `${previous.efficiency}%` }}
+                                  className={cn(
+                                    "h-full rounded-full opacity-60 transition-all duration-1000",
+                                    previous.efficiency > 50 ? "bg-green-500" : 
+                                    previous.efficiency > 20 ? "bg-blue-500" : 
+                                    "bg-red-500"
+                                  )}
+                                />
+                              </div>
+                            </div>
+                          )}
+                          {latest && previous && (
+                            <div className="col-span-1 sm:col-span-2 pt-2 border-t border-white/5">
+                              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider">
+                                <span className="text-white/40">Variação:</span>
+                                <span className={cn(
+                                  latest.efficiency >= previous.efficiency ? "text-green-400" : "text-red-400",
+                                  "flex items-center gap-1"
+                                )}>
+                                  {latest.efficiency >= previous.efficiency ? <TrendingUp className="w-3 h-3" /> : <ArrowDownCircle className="w-3 h-3" />}
+                                  {Math.abs(latest.efficiency - previous.efficiency)}%
+                                  <span className="text-[10px] opacity-60 ml-0.5">
+                                    {latest.efficiency >= previous.efficiency ? "Melhoria" : "Queda"}
+                                  </span>
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
+                ) : (
+                  /* Detailed View: Last 6 months */
+                  <motion.div 
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="space-y-6"
+                  >
+                    {[...reportData.monthlyData].reverse().slice(0, 6).map((month, idx) => (
+                      <div key={idx} className="space-y-2">
+                        <div className="flex justify-between items-center text-xs font-bold uppercase tracking-wider">
+                          <span className="text-white/60">{month.name} {idx === 0 && <span className="text-[8px] px-1.5 py-0.5 bg-white/10 rounded-full ml-1 text-white/50">Atual</span>}</span>
+                          <span className={cn(
+                            month.efficiency > 50 ? "text-green-400" : month.efficiency > 20 ? "text-yellow-400" : "text-red-400"
+                          )}>
+                            {month.efficiency}% de economia
+                          </span>
+                        </div>
+                        <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
+                          <motion.div 
+                            initial={{ width: 0 }}
+                            animate={{ width: `${month.efficiency}%` }}
+                            className={cn(
+                              "h-full rounded-full transition-all duration-1000",
+                              month.efficiency > 50 ? "bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.3)]" : 
+                              month.efficiency > 20 ? "bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.3)]" : 
+                              "bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.3)]"
+                            )}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </motion.div>
+                )}
               </div>
             </div>
 
