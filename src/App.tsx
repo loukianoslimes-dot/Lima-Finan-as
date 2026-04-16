@@ -1342,7 +1342,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
     };
   }, [filteredExpenses, isTitheEnabled, totalIncome, tithePaidMonths, currentDate]);
 
-  const balance = totalIncome - totalMonthlyExpenses;
+  const balance = totalIncome - (totalMonthlyExpenses - (isTitheEnabled && !isTithePaid ? titheValue : 0));
 
   // Logic for dynamic balance messages
   const balanceMessage = useMemo(() => {
