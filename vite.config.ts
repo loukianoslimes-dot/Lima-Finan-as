@@ -22,8 +22,3 @@ export default defineConfig(({mode}) => {
     },
   };
 });
-export default defineConfig({
-  base: '/nome-do-seu-repositorio/', // <--- ADICIONE ISTO
-  plugins: [react()],
-  // ... outras configs
-})
