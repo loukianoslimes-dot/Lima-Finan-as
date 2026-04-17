@@ -2,9 +2,9 @@ const CACHE_NAME = 'lima-financas-cache-v5';
 const DYNAMIC_ICON_CACHE = 'dynamic-icons';
 
 const urlsToCache = [
-  '/',
-  '/index.html',
-  '/manifest.json'
+  './',
+  'index.html',
+  'manifest.json'
 ];
 
 self.addEventListener('install', event => {
