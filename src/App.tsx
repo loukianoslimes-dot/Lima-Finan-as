@@ -174,73 +174,72 @@ const DebtorItem: React.FC<DebtorItemProps> = ({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       className={cn(
-        "group bg-white/5 hover:bg-white/10 backdrop-blur-md transition-colors p-4 rounded-2xl border border-white/10 flex items-center justify-between gap-4",
+        "group bg-white/5 hover:bg-white/10 backdrop-blur-md transition-colors p-3 sm:p-4 rounded-2xl border border-white/10 flex items-center justify-between gap-3 sm:gap-4",
         debtor.isReceived 
           ? "bg-green-500/20 border-green-500/40 shadow-[0_0_15px_rgba(34,197,94,0.1)]" 
           : "animate-blink-red"
       )}
     >
-      <div className="flex items-center gap-4 flex-1 min-w-0">
+      <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
         <div onPointerDown={(e) => e.stopPropagation()}>
           <Checkbox 
             checked={!!debtor.isReceived}
             onCheckedChange={() => onToggleReceived(debtor)}
-            className="border-white/30 data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
+            className="w-5 h-5 border-white/30 data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
           />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <h3 className={cn("font-bold truncate", debtor.isReceived && "text-green-100")}>
+          <div className="flex items-center gap-1.5 sm:gap-2 mb-0.5 sm:mb-1">
+            <h3 className={cn("font-bold text-sm sm:text-base truncate", debtor.isReceived && "text-green-100")}>
               {debtor.description}
             </h3>
             {debtor.isReceived ? (
-              <Badge className="bg-green-500 text-[10px] h-4 px-1 text-white">Recebido</Badge>
+              <Badge className="bg-green-500 text-[8px] sm:text-[10px] h-3.5 sm:h-4 px-1 text-white">Recebido</Badge>
             ) : (
-              <Badge variant="outline" className="border-white/20 text-white/40 text-[10px] h-4 px-1">Pendente</Badge>
+              <Badge variant="outline" className="border-white/20 text-white/40 text-[8px] sm:text-[10px] h-3.5 sm:h-4 px-1">Pendente</Badge>
             )}
           </div>
-          <div className="flex items-center gap-2 text-xs text-white/60">
+          <div className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs text-white/60">
             {debtor.category && (
-              <span className={cn("bg-white/10 px-2 py-0.5 rounded-full", debtor.isReceived && "bg-green-500/20 text-green-200")}>{debtor.category}</span>
+              <span className={cn("bg-white/10 px-1.5 sm:px-2 py-0.5 rounded-full", debtor.isReceived && "bg-green-500/20 text-green-200")}>{debtor.category}</span>
             )}
             <span>{formatDate(debtor.date)}</span>
           </div>
-          {debtor.notes && <p className={cn("text-xs text-white/40 mt-1 italic", debtor.isReceived && "text-green-200/40")}>{debtor.notes}</p>}
         </div>
       </div>
 
-      <div className="flex flex-col items-center gap-1 shrink-0 px-2 min-w-[70px]">
-        {debtor.isFixed && <Badge className="bg-blue-500/50 text-[10px] h-4 px-1">Fixa</Badge>}
+      <div className="flex flex-col items-center gap-0.5 sm:gap-1 shrink-0 px-1 sm:px-2 min-w-[60px] sm:min-w-[70px]">
+        {debtor.isFixed && <Badge className="bg-blue-500/50 text-[8px] sm:text-[10px] h-3.5 sm:h-4 px-1">Fixa</Badge>}
         {debtor.isRecurring && (
-          <Badge className="bg-purple-500/50 text-[10px] h-4 px-1 text-center">
-            Recorrente {installmentInfo && <span className="block text-[8px] opacity-80">({installmentInfo})</span>}
+          <Badge className="bg-purple-500/50 text-[8px] sm:text-[10px] h-3.5 sm:h-4 px-1 text-center">
+            Rec {installmentInfo && <span className="block text-[7px] sm:text-[8px] opacity-80">({installmentInfo})</span>}
           </Badge>
         )}
       </div>
       
-      <div className="flex items-center gap-4 ml-auto" onPointerDown={(e) => e.stopPropagation()}>
+      <div className="flex items-center gap-3 sm:gap-4 ml-auto" onPointerDown={(e) => e.stopPropagation()}>
         <div className="text-right shrink-0">
-          <div className={cn("font-bold flex items-baseline gap-1", debtor.isReceived ? "text-green-300" : "text-white")}>
-            <span className="text-[10px] opacity-50">{symbol}</span>
-            <span className="text-lg whitespace-nowrap">{amount}</span>
+          <div className={cn("font-bold flex items-baseline gap-0.5 sm:gap-1", debtor.isReceived ? "text-green-300" : "text-white")}>
+            <span className="text-[9px] sm:text-[10px] opacity-50">{symbol}</span>
+            <span className="text-base sm:text-lg whitespace-nowrap">{amount}</span>
           </div>
         </div>
         <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <Button 
             variant="ghost" 
             size="icon" 
-            className="h-7 w-7 text-white/70 hover:text-white hover:bg-white/10"
+            className="h-6 w-6 sm:h-7 sm:w-7 text-white/70 hover:text-white hover:bg-white/10"
             onClick={() => onEdit(debtor)}
           >
-            <Edit2 className="w-3.5 h-3.5" />
+            <Edit2 className="w-3 sm:h-3.5 sm:w-3.5 h-3" />
           </Button>
           <Button 
             variant="ghost" 
             size="icon" 
-            className="h-7 w-7 text-red-400 hover:text-red-300 hover:bg-red-500/20"
+            className="h-6 w-6 sm:h-7 sm:w-7 text-red-400 hover:text-red-300 hover:bg-red-500/20"
             onClick={() => onDelete(debtor.id)}
           >
-            <Trash2 className="w-3.5 h-3.5" />
+            <Trash2 className="w-3 sm:h-3.5 sm:w-3.5 h-3" />
           </Button>
         </div>
       </div>
@@ -277,83 +276,75 @@ const ExpenseItem: React.FC<ExpenseItemProps> = ({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       className={cn(
-        "group bg-white/5 hover:bg-white/10 backdrop-blur-md transition-colors p-4 rounded-2xl border border-white/10 flex items-center justify-between gap-4",
+        "group bg-white/5 hover:bg-white/10 backdrop-blur-md transition-colors p-3 sm:p-4 rounded-2xl border border-white/10 flex items-center justify-between gap-3 sm:gap-4",
         expense.isPaid && "bg-green-500/20 border-green-500/40 shadow-[0_0_15px_rgba(34,197,94,0.1)]"
       )}
     >
-      <div className="flex items-center gap-4 flex-1 min-w-0">
+      <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
         <div onPointerDown={(e) => e.stopPropagation()}>
           <Checkbox 
             checked={!!expense.isPaid}
             onCheckedChange={() => onTogglePaid(expense)}
-            className="border-white/30 data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
+            className="w-5 h-5 border-white/30 data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
           />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <h3 className={cn("font-bold truncate", expense.isPaid && "text-green-100")}>
+          <div className="flex items-center gap-1.5 sm:gap-2 mb-0.5 sm:mb-1">
+            <h3 className={cn("font-bold text-sm sm:text-base truncate", expense.isPaid && "text-green-100")}>
               {expense.description}
             </h3>
             {expense.isPaid ? (
-              <Badge className="bg-green-500 text-[10px] h-4 px-1 text-white flex items-center gap-1">
-                <Check className="w-2.5 h-2.5" />
+              <Badge className="bg-green-500 text-[8px] sm:text-[10px] h-3.5 sm:h-4 px-1 text-white flex items-center gap-0.5 sm:gap-1">
+                <Check className="w-2 sm:h-2.5 sm:w-2.5 h-2" />
                 Pago
               </Badge>
             ) : (
-              <Badge variant="outline" className="border-white/20 text-white/40 text-[10px] h-4 px-1 flex items-center gap-1">
-                <AlertCircle className="w-2.5 h-2.5" />
-                Pendente
+              <Badge variant="outline" className="border-white/20 text-white/40 text-[8px] sm:text-[10px] h-3.5 sm:h-4 px-1 flex items-center gap-0.5 sm:gap-1">
+                <AlertCircle className="w-2 sm:h-2.5 sm:w-2.5 h-2" />
+                Pend
               </Badge>
             )}
           </div>
-          <div className="flex items-center gap-2 text-xs text-white/60">
-            <span className={cn("bg-white/10 px-2 py-0.5 rounded-full", expense.isPaid && "bg-green-500/20 text-green-200")}>{expense.category}</span>
+          <div className="flex items-center gap-1 sm:gap-2 text-[10px] sm:text-xs text-white/60">
+            <span className={cn("bg-white/10 px-1.5 sm:px-2 py-0.5 rounded-full", expense.isPaid && "bg-green-500/20 text-green-200")}>{expense.category}</span>
             <span>•</span>
             <span>{formatDate(expense.date)}</span>
-            {expense.dueDate && (
-              <>
-                <span>•</span>
-                <span className="text-yellow-400/80">Venc: {formatDate(expense.dueDate)}</span>
-              </>
-            )}
           </div>
-          {expense.notes && <p className={cn("text-xs text-white/40 mt-1 italic", expense.isPaid && "text-green-200/40")}>{expense.notes}</p>}
         </div>
       </div>
 
-      {/* Indicadores no centro */}
-      <div className="flex flex-col items-center gap-1 shrink-0 px-2 min-w-[70px]">
-        {expense.isFixed && <Badge className="bg-blue-500/50 text-[10px] h-4 px-1">Fixa</Badge>}
+      <div className="flex flex-col items-center gap-0.5 sm:gap-1 shrink-0 px-1 sm:px-2 min-w-[60px] sm:min-w-[70px]">
+        {expense.isFixed && <Badge className="bg-blue-500/50 text-[8px] sm:text-[10px] h-3.5 sm:h-4 px-1">Fixa</Badge>}
         {expense.isRecurring && (
-          <Badge className="bg-purple-500/50 text-[10px] h-4 px-1 text-center">
-            Recorrente {installmentInfo && <span className="block text-[8px] opacity-80">({installmentInfo})</span>}
+          <Badge className="bg-purple-500/50 text-[8px] sm:text-[10px] h-3.5 sm:h-4 px-1 text-center">
+            Rec {installmentInfo && <span className="block text-[7px] sm:text-[8px] opacity-80">({installmentInfo})</span>}
           </Badge>
         )}
       </div>
       
-      <div className="flex items-center gap-4 ml-auto" onPointerDown={(e) => e.stopPropagation()}>
+      <div className="flex items-center gap-3 sm:gap-4 ml-auto" onPointerDown={(e) => e.stopPropagation()}>
         <div className="text-right shrink-0">
-          <div className={cn("font-bold flex items-baseline gap-1", expense.isPaid ? "text-green-300" : "text-white")}>
-            <span className="text-[10px] opacity-50">{symbol}</span>
-            <span className="text-lg whitespace-nowrap">{amount}</span>
+          <div className={cn("font-bold flex items-baseline gap-0.5 sm:gap-1", expense.isPaid ? "text-green-300" : "text-white")}>
+            <span className="text-[9px] sm:text-[10px] opacity-50">{symbol}</span>
+            <span className="text-base sm:text-lg whitespace-nowrap">{amount}</span>
           </div>
         </div>
         <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <Button 
             variant="ghost" 
             size="icon" 
-            className="h-7 w-7 text-white/70 hover:text-white hover:bg-white/10"
+            className="h-6 w-6 sm:h-7 sm:w-7 text-white/70 hover:text-white hover:bg-white/10"
             onClick={() => onEdit(expense)}
           >
-            <Edit2 className="w-3.5 h-3.5" />
+            <Edit2 className="w-3 sm:h-3.5 sm:w-3.5 h-3" />
           </Button>
           <Button 
             variant="ghost" 
             size="icon" 
-            className="h-7 w-7 text-red-400 hover:text-red-300 hover:bg-red-500/20"
+            className="h-6 w-6 sm:h-7 sm:w-7 text-red-400 hover:text-red-300 hover:bg-red-500/20"
             onClick={() => onDelete(expense.id)}
           >
-            <Trash2 className="w-3.5 h-3.5" />
+            <Trash2 className="w-3 sm:h-3.5 sm:w-3.5 h-3" />
           </Button>
         </div>
       </div>
@@ -3019,13 +3010,13 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
                   <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.15 }}>
                     <Card 
                       className={cn(
-                        "liquid-glass text-white overflow-hidden relative p-4 rounded-2xl h-full flex flex-col justify-between transition-all duration-300",
+                        "liquid-glass text-white overflow-hidden relative p-3 sm:p-4 rounded-2xl h-full flex flex-col justify-between transition-all duration-300",
                         tributes.every(t => !t.enabled) && "opacity-60"
                       )}
                     >
-                      <div className="flex justify-between items-start mb-2 relative z-10 w-full">
+                      <div className="flex justify-between items-start mb-1 sm:mb-2 relative z-10 w-full">
                         <div className="flex flex-col w-full">
-                          <div className="text-[10px] font-bold text-white/70 uppercase tracking-widest flex items-center justify-between w-full">
+                          <div className="text-[8px] sm:text-[10px] font-bold text-white/70 uppercase tracking-widest flex items-center justify-between w-full">
                             Tributos
                             <Button
                               variant="ghost" 
@@ -3039,9 +3030,9 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
                         </div>
                       </div>
                       <div>
-                        <div className="flex items-baseline gap-1 overflow-hidden">
-                          <span className="text-[10px] opacity-50 font-bold">- R$</span>
-                          <div className="text-lg sm:text-xl font-bold truncate text-red-300">
+                        <div className="flex items-baseline gap-0.5 sm:gap-1 overflow-hidden">
+                          <span className="text-[8px] sm:text-[10px] opacity-50 font-bold">- R$</span>
+                          <div className="text-base sm:text-xl font-bold truncate text-red-300">
                             {totalTributesDiscount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                           </div>
                         </div>
@@ -3082,21 +3073,21 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
                   </motion.div>
 
                   <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.2 }}>
-                    <Card className="liquid-glass text-white overflow-hidden relative p-4 rounded-2xl h-full">
+                    <Card className="liquid-glass text-white overflow-hidden relative p-3 sm:p-4 rounded-2xl h-full">
                       <div className="absolute top-0 right-0 p-2 opacity-10">
-                        <ArrowDownCircle className="w-8 h-8" />
+                        <ArrowDownCircle className="w-6 h-6 sm:w-8 sm:h-8" />
                       </div>
-                      <div className="text-[10px] font-bold text-white/70 uppercase mb-1 tracking-widest">A Pagar</div>
-                      <div className="flex items-baseline gap-1 text-red-300 mb-2">
-                        <span className="text-xs opacity-50 font-bold">R$</span>
-                        <div className="text-xl font-bold truncate">{formatCurrencyParts(totalRemainingExpenses).amount}</div>
+                      <div className="text-[8px] sm:text-[10px] font-bold text-white/70 uppercase mb-0.5 sm:mb-1 tracking-widest">A Pagar</div>
+                      <div className="flex items-baseline gap-0.5 sm:gap-1 text-red-300 mb-1 sm:mb-2">
+                        <span className="text-[10px] sm:text-xs opacity-50 font-bold">R$</span>
+                        <div className="text-lg sm:text-xl font-bold truncate">{formatCurrencyParts(totalRemainingExpenses).amount}</div>
                       </div>
-                      <div className="flex flex-col gap-1 border-t border-white/5 pt-2">
-                        <div className="flex justify-between text-[17px] uppercase tracking-tight">
+                      <div className="flex flex-col gap-0.5 sm:gap-1 border-t border-white/5 pt-2">
+                        <div className="flex justify-between text-[11px] sm:text-[13px] uppercase tracking-tight">
                           <span className="text-white/40">Pago:</span>
                           <span className="text-green-400 font-bold">{formatCurrency(totalPaidExpenses)}</span>
                         </div>
-                        <div className="flex justify-between text-[17px] uppercase tracking-tight">
+                        <div className="flex justify-between text-[11px] sm:text-[13px] uppercase tracking-tight">
                           <span className="text-white/40">Total:</span>
                           <span className="text-white/60 font-medium">{formatCurrency(totalMonthlyExpenses)}</span>
                         </div>
@@ -3109,23 +3100,23 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
                     animate={{ opacity: 1, scale: 1 }} 
                     transition={{ delay: 0.3 }}
                   >
-                    <Card className="liquid-glass text-white overflow-hidden relative p-4 rounded-2xl h-full">
+                    <Card className="liquid-glass text-white overflow-hidden relative p-3 sm:p-4 rounded-2xl h-full">
                       <div className="absolute top-0 right-0 p-2 opacity-10">
-                        <Wallet className="w-8 h-8" />
+                        <Wallet className="w-6 h-6 sm:w-8 sm:h-8" />
                       </div>
-                      <div className="text-[10px] font-bold text-white/70 uppercase mb-1 tracking-widest">Saldo</div>
-                      <div className={cn("flex items-baseline gap-1", balance >= 0 ? "text-green-300" : "text-red-400")}>
-                        <span className="text-xs opacity-50 font-bold">R$</span>
-                        <div className="text-xl font-bold truncate">{formatCurrencyParts(balance).amount}</div>
+                      <div className="text-[8px] sm:text-[10px] font-bold text-white/70 uppercase mb-0.5 sm:mb-1 tracking-widest">Saldo</div>
+                      <div className={cn("flex items-baseline gap-0.5 sm:gap-1", balance >= 0 ? "text-green-300" : "text-red-400")}>
+                        <span className="text-[10px] sm:text-xs opacity-50 font-bold">R$</span>
+                        <div className="text-lg sm:text-xl font-bold truncate">{formatCurrencyParts(balance).amount}</div>
                       </div>
 
                       {/* Savings Progress Bar */}
-                      <div className="mt-4 space-y-1.5">
-                        <div className="flex justify-between items-center text-[8px] uppercase font-bold tracking-widest text-white/30">
-                          <span>Eficiência Financeira</span>
+                      <div className="mt-2 sm:mt-4 space-y-1 sm:space-y-1.5">
+                        <div className="flex justify-between items-center text-[7px] sm:text-[8px] uppercase font-bold tracking-widest text-white/30">
+                          <span>Eficiência</span>
                           <span>{totalIncome > 0 ? Math.max(0, Math.round((balance / totalIncome) * 100)) : 0}%</span>
                         </div>
-                        <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
+                        <div className="h-1 sm:h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
                           <motion.div 
                             initial={{ width: 0 }}
                             animate={{ 
@@ -3157,40 +3148,42 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
                 className="liquid-glass rounded-3xl overflow-hidden"
               >
                 <div 
-                  className="w-full p-6 border-b border-white/10 flex justify-between items-center transition-colors"
+                  className="w-full p-4 sm:p-6 border-b border-white/10 flex flex-col sm:flex-row justify-between sm:items-center transition-colors gap-3"
                 >
                   <button
                     onClick={() => setIsFixedExpensesExpanded(!isFixedExpensesExpanded)}
-                    className="flex-1 flex items-center gap-3 text-left hover:opacity-80 transition-opacity"
+                    className="flex-1 flex items-center gap-2 sm:gap-3 text-left hover:opacity-80 transition-opacity"
                   >
-                    <h2 className="text-xl font-bold">Despesas Fixas</h2>
+                    <h2 className="text-lg sm:text-xl font-bold">Despesas Fixas</h2>
                     <motion.div
                       animate={{ rotate: isFixedExpensesExpanded ? 180 : 0 }}
                       transition={{ duration: 0.3 }}
                     >
-                      <ChevronDown className="w-5 h-5 text-white/50" />
+                      <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-white/50" />
                     </motion.div>
                   </button>
-                  <div className="flex items-center gap-3">
-                    <div className="text-sm font-bold text-green-400 bg-green-400/10 px-3 py-1 rounded-full">
-                      {formatCurrency(fixedExpenses.reduce((sum, exp) => sum + exp.value, 0))}
+                  <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3">
+                    <div className="flex items-center gap-2">
+                      <div className="text-xs sm:text-sm font-bold text-green-400 bg-green-400/10 px-2 sm:px-3 py-1 rounded-full">
+                        {formatCurrency(fixedExpenses.reduce((sum, exp) => sum + exp.value, 0))}
+                      </div>
+                      <Badge variant="outline" className="text-white border-white/30 text-[9px] sm:text-xs">
+                        {fixedExpenses.length} itens
+                      </Badge>
                     </div>
-                    <Badge variant="outline" className="text-white border-white/30">
-                      {fixedExpenses.length} itens
-                    </Badge>
+                    <Button
+                      variant="ghost" 
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleMarkAllFixedPaid();
+                      }}
+                      className="h-7 sm:h-8 text-[8px] sm:text-[10px] uppercase font-bold text-blue-300 hover:text-blue-200 hover:bg-blue-300/10 gap-1 sm:gap-1.5"
+                    >
+                      <CheckCheck className="w-3 sm:h-3.5 sm:w-3.5 h-3" />
+                      Pagar Todas
+                    </Button>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleMarkAllFixedPaid();
-                    }}
-                    className="h-8 text-[10px] uppercase font-bold text-blue-300 hover:text-blue-200 hover:bg-blue-300/10 gap-1.5"
-                  >
-                    <CheckCheck className="w-3.5 h-3.5" />
-                    Pagar Todas
-                  </Button>
                 </div>
                 <AnimatePresence initial={false}>
                   {isFixedExpensesExpanded && (
@@ -4188,132 +4181,134 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
 
         {/* Navigation Bar (Mobile Friendly) */}
         {user && (
-          <div className="fixed bottom-0 left-0 right-0 p-4 flex justify-center z-40">
-            <div className="bg-white/10 backdrop-blur-2xl border border-white/20 rounded-full p-2 flex items-center gap-1 shadow-2xl">
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={() => setActiveTab("home")}
-                className={cn("w-12 h-12 rounded-full transition-all", activeTab === "home" ? "bg-white text-[#04142c]" : "text-white/60")}
-                title="Início"
-              >
-                <Home className="w-6 h-6" />
-              </Button>
-
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={() => setActiveTab("debtors")}
-                className={cn("w-12 h-12 rounded-full transition-all", activeTab === "debtors" ? "bg-white text-[#04142c]" : "text-white/60")}
-                title="Devedores"
-              >
-                <UserIcon className="w-6 h-6" />
-              </Button>
-
-              <div className="relative">
-                <AnimatePresence>
-                  {isSpeedDialOpen && (
-                    <>
-                      {/* Backdrop for Speed Dial */}
-                      <motion.div 
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className={cn("fixed inset-0 backdrop-blur-sm z-[60]", theme === 'dark' ? "bg-zinc-950/80" : "bg-[#04142c]/80")}
-                        onClick={() => setIsSpeedDialOpen(false)}
-                      />
-                      
-                      {/* Speed Dial Options */}
-                      <motion.div 
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 20 }}
-                        className="fixed left-1/2 bottom-28 -translate-x-1/2 flex items-end justify-center gap-6 z-[70]"
+          <>
+            <AnimatePresence>
+              {isSpeedDialOpen && (
+                <>
+                  {/* Backdrop for Speed Dial - Truly global fixed inset-0 */}
+                  <motion.div 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className={cn("fixed inset-0 backdrop-blur-md z-[60]", theme === 'dark' ? "bg-zinc-950/40" : "bg-black/30")}
+                    onClick={() => setIsSpeedDialOpen(false)}
+                  />
+                  
+                  {/* Speed Dial Options */}
+                  <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 20 }}
+                    className="fixed left-1/2 bottom-24 -translate-x-1/2 flex items-end justify-center gap-4 sm:gap-6 z-[70] w-full max-w-xs"
+                  >
+                    {/* Extra button */}
+                    <div className="flex flex-col items-center gap-2">
+                      <button 
+                        onClick={() => {
+                          setIsSpeedDialOpen(false);
+                          setEditingAdditionalSalary(null);
+                          setIsAdditionalSalaryModalOpen(true);
+                        }}
+                        className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center text-blue-400 hover:scale-110 active:scale-95 transition-all shadow-xl"
                       >
-                        {/* Extra button */}
-                        <div className="flex flex-col items-center gap-2">
-                          <button 
-                            onClick={() => {
-                              setIsSpeedDialOpen(false);
-                              setEditingAdditionalSalary(null);
-                              setIsAdditionalSalaryModalOpen(true);
-                            }}
-                            className="w-14 h-14 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center text-blue-400 hover:scale-110 active:scale-95 transition-all shadow-xl"
-                          >
-                            <Banknote className="w-6 h-6" />
-                          </button>
-                          <span className="text-[10px] font-bold text-white uppercase tracking-widest">Extra</span>
-                        </div>
+                        <Banknote className="w-5 h-5 sm:w-6 sm:h-6" />
+                      </button>
+                      <span className="text-[10px] font-bold text-white uppercase tracking-widest">Extra</span>
+                    </div>
 
-                        {/* Despesa (Main Action in Center) */}
-                        <div className="flex flex-col items-center gap-2 -translate-y-4">
-                          <button 
-                            onClick={() => {
-                              setIsSpeedDialOpen(false);
-                              resetForm();
-                              setIsAddModalOpen(true);
-                            }}
-                            className="w-20 h-20 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center text-rose-400 hover:scale-110 active:scale-95 transition-all shadow-xl"
-                          >
-                            <Plus className="w-10 h-10" />
-                          </button>
-                          <span className="text-xs font-bold text-white uppercase tracking-widest">Despesa</span>
-                        </div>
+                    {/* Despesa (Main Action in Center) */}
+                    <div className="flex flex-col items-center gap-2 -translate-y-4">
+                      <button 
+                        onClick={() => {
+                          setIsSpeedDialOpen(false);
+                          resetForm();
+                          setIsAddModalOpen(true);
+                        }}
+                        className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center text-rose-400 hover:scale-110 active:scale-95 transition-all shadow-xl"
+                      >
+                        <Plus className="w-8 h-8 sm:w-10 sm:h-10" />
+                      </button>
+                      <span className="text-xs font-bold text-white uppercase tracking-widest">Despesa</span>
+                    </div>
 
-                        {/* Devedor button */}
-                        <div className="flex flex-col items-center gap-2">
-                          <button 
-                            onClick={() => {
-                              setIsSpeedDialOpen(false);
-                              setEditingDebtor(null);
-                              setIsDebtorModalOpen(true);
-                            }}
-                            className="w-14 h-14 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center text-purple-400 hover:scale-110 active:scale-95 transition-all shadow-xl"
-                          >
-                            <UserPlus className="w-6 h-6" />
-                          </button>
-                          <span className="text-[10px] font-bold text-white uppercase tracking-widest">Devedor</span>
-                        </div>
-                      </motion.div>
-                    </>
-                  )}
-                </AnimatePresence>
+                    {/* Devedor button */}
+                    <div className="flex flex-col items-center gap-2">
+                      <button 
+                        onClick={() => {
+                          setIsSpeedDialOpen(false);
+                          setEditingDebtor(null);
+                          setIsDebtorModalOpen(true);
+                        }}
+                        className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center text-purple-400 hover:scale-110 active:scale-95 transition-all shadow-xl"
+                      >
+                        <UserPlus className="w-5 h-5 sm:w-6 sm:h-6" />
+                      </button>
+                      <span className="text-[10px] font-bold text-white uppercase tracking-widest">Devedor</span>
+                    </div>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
+
+            <div className="fixed bottom-0 left-0 right-0 p-4 flex justify-center z-40 pointer-events-none">
+              <div className="bg-white/10 backdrop-blur-2xl border border-white/20 rounded-full p-1.5 sm:p-2 flex items-center gap-1 shadow-2xl pointer-events-auto">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => setActiveTab("home")}
+                  className={cn("w-10 h-10 sm:w-12 sm:h-12 rounded-full transition-all", activeTab === "home" ? "bg-white text-[#04142c]" : "text-white/60")}
+                  title="Início"
+                >
+                  <Home className="w-5 h-5 sm:w-6 sm:h-6" />
+                </Button>
 
                 <Button 
-                  onClick={() => setIsSpeedDialOpen(!isSpeedDialOpen)}
-                  className={cn(
-                    "w-12 h-12 rounded-full transition-all z-[80] relative",
-                    isSpeedDialOpen 
-                      ? "bg-rose-500 text-white rotate-45" 
-                      : "bg-green-500 text-white shadow-lg hover:bg-green-600"
-                  )}
-                  title="Menu de adição"
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => setActiveTab("debtors")}
+                  className={cn("w-10 h-10 sm:w-12 sm:h-12 rounded-full transition-all", activeTab === "debtors" ? "bg-white text-[#04142c]" : "text-white/60")}
+                  title="Devedores"
                 >
-                  <Plus className="w-6 h-6" />
+                  <UserIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                </Button>
+
+                <div className="relative">
+                  <Button 
+                    onClick={() => setIsSpeedDialOpen(!isSpeedDialOpen)}
+                    className={cn(
+                      "w-10 h-10 sm:w-12 sm:h-12 rounded-full transition-all z-[80] relative",
+                      isSpeedDialOpen 
+                        ? "bg-rose-500 text-white rotate-45" 
+                        : "bg-green-500 text-white shadow-lg hover:bg-green-600"
+                    )}
+                    title="Menu de adição"
+                  >
+                    <Plus className="w-5 h-5 sm:w-6 sm:h-6" />
+                  </Button>
+                </div>
+
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => setActiveTab("report")}
+                  className={cn("w-10 h-10 sm:w-12 sm:h-12 rounded-full transition-all", activeTab === "report" ? "bg-white text-[#04142c]" : "text-white/60")}
+                  title="Relatório"
+                >
+                  <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6" />
+                </Button>
+                
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => setActiveTab("settings")}
+                  className={cn("w-10 h-10 sm:w-12 sm:h-12 rounded-full transition-all", activeTab === "settings" ? "bg-white text-[#04142c]" : "text-white/60")}
+                  title="Configuração"
+                >
+                  <Settings className="w-5 h-5 sm:w-6 sm:h-6" />
                 </Button>
               </div>
-
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={() => setActiveTab("report")}
-                className={cn("w-12 h-12 rounded-full transition-all", activeTab === "report" ? "bg-white text-[#04142c]" : "text-white/60")}
-                title="Relatório"
-              >
-                <BarChart3 className="w-6 h-6" />
-              </Button>
-              
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={() => setActiveTab("settings")}
-                className={cn("w-12 h-12 rounded-full transition-all", activeTab === "settings" ? "bg-white text-[#04142c]" : "text-white/60")}
-                title="Configuração"
-              >
-                <Settings className="w-6 h-6" />
-              </Button>
             </div>
-          </div>
+          </>
         )}
     </>
   )}
@@ -5554,286 +5549,286 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
           </button>
 
           <Dialog open={isAdminPanelOpen} onOpenChange={setIsAdminPanelOpen}>
-            <DialogContent className={cn("backdrop-blur-3xl border-white/10 text-white rounded-[2rem] w-[95vw] sm:max-w-xl max-h-[85vh] flex flex-col p-0 overflow-hidden", theme === 'dark' ? "bg-zinc-950/95" : "bg-[#04142c]/95")}>
-              <div className="p-6 border-b border-white/10">
-                <DialogHeader>
-                  <DialogTitle className="text-2xl font-bold flex items-center gap-3">
-                    <ShieldCheck className="w-6 h-6 text-blue-400" />
-                    Gerenciamento Geral
-                  </DialogTitle>
-                </DialogHeader>
-                
-                <div className="flex gap-2 mt-6 bg-white/5 p-1 rounded-2xl border border-white/5 overflow-x-auto custom-scrollbar">
-                  <button
-                    onClick={() => setAdminTab('users')}
-                    className={cn(
-                      "flex-1 min-w-[100px] py-3 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all",
-                      adminTab === 'users' ? "bg-white text-[#04142c] shadow-lg" : "text-white/40 hover:text-white/60"
-                    )}
-                  >
-                    Solicitações
-                  </button>
-                  <button
-                    onClick={() => setAdminTab('feedbacks')}
-                    className={cn(
-                      "flex-1 min-w-[100px] py-3 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all",
-                      adminTab === 'feedbacks' ? "bg-white text-[#04142c] shadow-lg" : "text-white/40 hover:text-white/60"
-                    )}
-                  >
-                    Feedbacks ({feedbacks.length})
-                  </button>
-                  <button
-                    onClick={() => setAdminTab('updates')}
-                    className={cn(
-                      "flex-1 min-w-[100px] py-3 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all",
-                      adminTab === 'updates' ? "bg-white text-[#04142c] shadow-lg" : "text-white/40 hover:text-white/60"
-                    )}
-                  >
-                    Atualização
-                  </button>
-                </div>
-              </div>
+            <DialogContent className={cn("liquid-glass border-white/10 text-white rounded-[2rem] w-[95vw] sm:max-w-xl max-h-[85vh] flex flex-col p-0 overflow-hidden", theme === 'dark' ? "bg-zinc-950/95" : "bg-[#04142c]/95")}>
+            <div className="p-4 sm:p-6 border-b border-white/10 bg-white/5">
+              <DialogHeader>
+                <DialogTitle className="text-xl sm:text-2xl font-bold flex items-center gap-3">
+                  <ShieldCheck className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400" />
+                  Gerenciamento Geral
+                </DialogTitle>
+              </DialogHeader>
               
-              <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
-                {adminTab === 'users' ? (
-                  <div className="space-y-6">
-                    <div className="flex gap-2 bg-white/5 p-1 rounded-xl border border-white/5 overflow-x-auto custom-scrollbar no-scrollbar scroll-smooth">
-                      {[
-                        { id: 'pending', label: 'Pendentes' },
-                        { id: 'active', label: 'Aprovadas' },
-                        { id: 'rejected', label: 'Recusados' },
-                        { id: 'removed', label: 'Removidos' }
-                      ].map((subTab) => (
-                        <button
-                          key={subTab.id}
-                          onClick={() => setAdminSubTab(subTab.id as any)}
-                          className={cn(
-                            "flex-1 min-w-[90px] py-2 rounded-lg font-bold text-[9px] uppercase tracking-wider transition-all",
-                            adminSubTab === subTab.id ? "bg-blue-500 text-white shadow-md" : "text-white/30 hover:text-white/50"
-                          )}
-                        >
-                          {subTab.label}
-                        </button>
-                      ))}
-                    </div>
-
-                    {allAppUsers.filter(u => u.status === adminSubTab).length === 0 ? (
-                      <div className="text-center py-12 text-white/30 italic">Nenhum usuário nesta categoria.</div>
-                    ) : (
-                      <div className="space-y-3">
-                        {allAppUsers
-                          .filter(u => u.status === adminSubTab)
-                          .map(userItem => (
-                          <div key={userItem.id} className="bg-white/5 p-4 rounded-2xl border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                            <div className="flex-1">
-                              <div className="font-bold flex items-center justify-between sm:justify-start gap-2">
-                                {userItem.name}
-                                <span className={cn(
-                                  "text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider font-bold border",
-                                  userItem.status === 'active' ? "bg-green-500/10 border-green-500/20 text-green-400" :
-                                  userItem.status === 'pending' ? "bg-yellow-500/10 border-yellow-500/20 text-yellow-400" :
-                                  userItem.status === 'removed' ? "bg-zinc-500/10 border-zinc-500/20 text-zinc-400" :
-                                  "bg-red-500/10 border-red-500/20 text-red-400"
-                                )}>
-                                  {userItem.status === 'active' ? 'Aprovado' : userItem.status === 'pending' ? 'Pendente' : userItem.status === 'removed' ? 'Removido' : 'Recusado'}
-                                </span>
-                              </div>
-                              <div className="text-sm text-white/60">{userItem.email}</div>
-                            </div>
-                            
-                            <div className="flex gap-2 w-full sm:w-auto">
-                              {(userItem.status === 'pending' || userItem.status === 'rejected' || userItem.status === 'removed') && (
-                                <Button 
-                                  size="sm"
-                                  onClick={() => handleUpdateAppUserStatus(userItem.id, 'active')}
-                                  className="flex-1 sm:flex-none bg-green-500/20 hover:bg-green-500/30 text-green-400 font-bold border border-green-500/30"
-                                >
-                                  <CheckCircle className="w-4 h-4 mr-1" />
-                                  Aprovar
-                                </Button>
-                              )}
-                              {userItem.status === 'pending' && (
-                                <Button 
-                                  size="sm"
-                                  onClick={() => handleUpdateAppUserStatus(userItem.id, 'rejected')}
-                                  className="flex-1 sm:flex-none bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold border border-red-500/30"
-                                >
-                                  <XCircle className="w-4 h-4 mr-1" />
-                                  Recusar
-                                </Button>
-                              )}
-                              {userItem.status === 'active' && (
-                                <Button 
-                                  size="sm"
-                                  onClick={() => handleUpdateAppUserStatus(userItem.id, 'removed')}
-                                  className="flex-1 sm:flex-none bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold border border-red-500/30"
-                                >
-                                  <Trash2 className="w-4 h-4 mr-1" />
-                                  Remover
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+              <div className="flex gap-2 mt-4 sm:mt-6 bg-white/5 p-1 rounded-2xl border border-white/5 overflow-x-auto custom-scrollbar">
+                <button
+                  onClick={() => setAdminTab('users')}
+                  className={cn(
+                    "flex-1 min-w-[90px] py-2.5 sm:py-3 rounded-xl font-bold text-[9px] sm:text-[10px] uppercase tracking-widest transition-all",
+                    adminTab === 'users' ? "bg-white text-[#04142c] shadow-lg" : "text-white/40 hover:text-white/60"
+                  )}
+                >
+                  Solicitações
+                </button>
+                <button
+                  onClick={() => setAdminTab('feedbacks')}
+                  className={cn(
+                    "flex-1 min-w-[90px] py-2.5 sm:py-3 rounded-xl font-bold text-[9px] sm:text-[10px] uppercase tracking-widest transition-all",
+                    adminTab === 'feedbacks' ? "bg-white text-[#04142c] shadow-lg" : "text-white/40 hover:text-white/60"
+                  )}
+                >
+                  Feedbacks ({feedbacks.length})
+                </button>
+                <button
+                  onClick={() => setAdminTab('updates')}
+                  className={cn(
+                    "flex-1 min-w-[90px] py-2.5 sm:py-3 rounded-xl font-bold text-[9px] sm:text-[10px] uppercase tracking-widest transition-all",
+                    adminTab === 'updates' ? "bg-white text-[#04142c] shadow-lg" : "text-white/40 hover:text-white/60"
+                  )}
+                >
+                  Atualização
+                </button>
+              </div>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 custom-scrollbar">
+              {adminTab === 'users' ? (
+                <div className="space-y-4 sm:space-y-6">
+                  <div className="flex gap-1.5 bg-white/5 p-1 rounded-xl border border-white/5 overflow-x-auto custom-scrollbar no-scrollbar scroll-smooth">
+                    {[
+                      { id: 'pending', label: 'Pendentes' },
+                      { id: 'active', label: 'Aprovadas' },
+                      { id: 'rejected', label: 'Recusados' },
+                      { id: 'removed', label: 'Removidos' }
+                    ].map((subTab) => (
+                      <button
+                        key={subTab.id}
+                        onClick={() => setAdminSubTab(subTab.id as any)}
+                        className={cn(
+                          "flex-1 min-w-[80px] py-2 rounded-lg font-bold text-[8px] sm:text-[9px] uppercase tracking-wider transition-all",
+                          adminSubTab === subTab.id ? "bg-blue-500 text-white shadow-md" : "text-white/30 hover:text-white/50"
+                        )}
+                      >
+                        {subTab.label}
+                      </button>
+                    ))}
                   </div>
-                ) : adminTab === 'feedbacks' ? (
-                  <div className="space-y-6">
-                    <Card className="liquid-glass text-white overflow-hidden relative p-4 rounded-2xl flex flex-col justify-between">
-                      <div className="absolute top-0 right-0 p-2 opacity-10">
-                        <ShieldCheck className="w-8 h-8" />
-                      </div>
-                      <div>
-                        <div className="text-[10px] font-bold text-white/70 uppercase mb-1 tracking-widest">Status Geral</div>
-                        <div className="flex items-baseline gap-1 mb-2">
-                          <div className="text-xl sm:text-2xl font-bold text-blue-300">
-                            {feedbackStats.approvalRate > 0 ? `${Math.round(feedbackStats.approvalRate)}%` : '---'}
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="space-y-1.5 border-t border-white/5 pt-3">
-                        <div className="flex justify-between items-center text-[8px] uppercase font-bold tracking-widest text-white/30">
-                          <span>Taxa de Aprovação</span>
-                          <span className="text-yellow-400 font-bold flex items-center gap-0.5">
-                            <Star className="w-2 h-2 fill-yellow-400" />
-                            {feedbackStats.average.toFixed(1)}
-                          </span>
-                        </div>
-                        <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
-                          <motion.div 
-                            initial={{ width: 0 }}
-                            animate={{ 
-                              width: `${feedbackStats.approvalRate}%`,
-                              backgroundColor: "rgba(250, 204, 21, 0.6)"
-                            }}
-                            className="h-full rounded-full shadow-[0_0_8px_rgba(250,204,21,0.2)]"
-                          />
-                        </div>
-                        <div className="text-[8px] text-white/40 font-bold uppercase tracking-tighter mt-1">
-                          Baseado em {feedbackStats.count} feedbacks
-                        </div>
-                      </div>
-                    </Card>
 
-                    {feedbacks.length === 0 ? (
-                      <div className="text-center py-12 text-white/30 italic">Nenhum feedback recebido ainda.</div>
-                    ) : (
-                      <div className="space-y-4">
-                        {feedbacks
-                          .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-                          .map(fb => (
-                          <div key={fb.id} className="bg-white/5 p-5 rounded-3xl border border-white/10 space-y-3">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <div className="font-bold text-white">{fb.userName}</div>
-                              <div className="text-[10px] text-white/40">{fb.userEmail}</div>
+                  {allAppUsers.filter(u => u.status === adminSubTab).length === 0 ? (
+                    <div className="text-center py-12 text-white/30 italic text-sm">Nenhum usuário nesta categoria.</div>
+                  ) : (
+                    <div className="space-y-3">
+                      {allAppUsers
+                        .filter(u => u.status === adminSubTab)
+                        .map(userItem => (
+                        <div key={userItem.id} className="bg-white/5 p-3 sm:p-4 rounded-2xl border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="font-bold flex items-center justify-between sm:justify-start gap-2">
+                              <span className="truncate">{userItem.name}</span>
+                              <span className={cn(
+                                "text-[9px] px-2 py-0.5 rounded-full uppercase tracking-wider font-bold border shrink-0",
+                                userItem.status === 'active' ? "bg-green-500/10 border-green-500/20 text-green-400" :
+                                userItem.status === 'pending' ? "bg-yellow-500/10 border-yellow-500/20 text-yellow-400" :
+                                userItem.status === 'removed' ? "bg-zinc-500/10 border-zinc-500/20 text-zinc-400" :
+                                "bg-red-500/10 border-red-500/20 text-red-400"
+                              )}>
+                                {userItem.status === 'active' ? 'Aprovado' : userItem.status === 'pending' ? 'Pendente' : userItem.status === 'removed' ? 'Removido' : 'Recusado'}
+                              </span>
                             </div>
-                            <div className="flex bg-yellow-400/10 px-2 py-1 rounded-lg">
-                              {[1, 2, 3, 4, 5].map((star) => (
-                                <Star 
-                                  key={star}
-                                  className={cn(
-                                    "w-3 h-3",
-                                    fb.stars >= star ? "text-yellow-400 fill-yellow-400" : "text-white/10"
-                                  )} 
-                                />
-                              ))}
-                            </div>
+                            <div className="text-xs text-white/60 truncate">{userItem.email}</div>
                           </div>
                           
-                          <div className="text-sm text-white/80 leading-relaxed bg-white/5 p-4 rounded-2xl italic border border-white/5">
-                            "{fb.message}"
-                          </div>
-                          
-                          <div className="flex justify-between items-center text-[10px] text-white/30 uppercase tracking-widest font-bold">
-                            <span>ID: {fb.userId.slice(0, 8)}...</span>
-                            <span>{new Date(fb.updatedAt).toLocaleDateString('pt-BR')}</span>
+                          <div className="flex gap-2 w-full sm:w-auto">
+                            {(userItem.status === 'pending' || userItem.status === 'rejected' || userItem.status === 'removed') && (
+                              <Button 
+                                size="sm"
+                                onClick={() => handleUpdateAppUserStatus(userItem.id, 'active')}
+                                className="flex-1 sm:flex-none h-9 bg-green-500/20 hover:bg-green-500/30 text-green-400 font-bold border border-green-500/30 text-[10px] sm:text-xs"
+                              >
+                                <CheckCircle className="w-3.5 h-3.5 mr-1" />
+                                Aprovar
+                              </Button>
+                            )}
+                            {userItem.status === 'pending' && (
+                              <Button 
+                                size="sm"
+                                onClick={() => handleUpdateAppUserStatus(userItem.id, 'rejected')}
+                                className="flex-1 sm:flex-none h-9 bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold border border-red-500/30 text-[10px] sm:text-xs"
+                              >
+                                <XCircle className="w-3.5 h-3.5 mr-1" />
+                                Recusar
+                              </Button>
+                            )}
+                            {userItem.status === 'active' && (
+                              <Button 
+                                size="sm"
+                                onClick={() => handleUpdateAppUserStatus(userItem.id, 'removed')}
+                                className="flex-1 sm:flex-none h-9 bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold border border-red-500/30 text-[10px] sm:text-xs"
+                              >
+                                <Trash2 className="w-3.5 h-3.5 mr-1" />
+                                Remover
+                              </Button>
+                            )}
                           </div>
                         </div>
                       ))}
                     </div>
                   )}
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-2xl">
-                      <div className="flex items-center gap-2 text-blue-400 mb-2 font-bold">
-                        <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                        Atenção
-                      </div>
-                      <p className="text-sm text-white/70">
-                        Os dados aqui preenchidos serão exibidos no balão de atualização do sistema <strong>somente após um novo deploy no Vercel (versão real disponível)</strong>. Não force os usuários a atualizar para versões quebradas.
-                      </p>
+                </div>
+              ) : adminTab === 'feedbacks' ? (
+                <div className="space-y-4 sm:space-y-6">
+                  <Card className="liquid-glass text-white overflow-hidden relative p-4 rounded-2xl flex flex-col justify-between">
+                    <div className="absolute top-0 right-0 p-2 opacity-10">
+                      <ShieldCheck className="w-8 h-8" />
                     </div>
-
-                    <div className="space-y-4">
-                      <div>
-                        <Label>Título Menor / Tagline</Label>
-                        <Input 
-                          placeholder="Ex: Nova Funcionalidade!" 
-                          className="bg-white/5 border-white/10 text-white h-12"
-                          value={updateForm.title}
-                          onChange={(e) => setUpdateForm({ ...updateForm, title: e.target.value })}
-                        />
-                      </div>
-                      <div>
-                        <Label>Versão</Label>
-                        <Input 
-                          placeholder="Ex: 2.1.0" 
-                          className="bg-white/5 border-white/10 text-white h-12"
-                          value={updateForm.version}
-                          onChange={(e) => setUpdateForm({ ...updateForm, version: e.target.value })}
-                        />
-                      </div>
-                      <div>
-                        <Label>Changelog (O que mudou)</Label>
-                        <Textarea 
-                          placeholder="Melhorias de estabilidade..." 
-                          className="bg-white/5 border-white/10 text-white min-h-[120px]"
-                          value={updateForm.changelog}
-                          onChange={(e) => setUpdateForm({ ...updateForm, changelog: e.target.value })}
-                        />
-                      </div>
-                      <div className="flex items-center gap-3 bg-white/5 p-4 border border-white/10 rounded-2xl hover:bg-white/10 transition-colors">
-                        <Checkbox 
-                          id="isMandatory" 
-                          className="border-white/30 data-[state=checked]:bg-red-500 data-[state=checked]:border-red-500" 
-                          checked={updateForm.isMandatory}
-                          onCheckedChange={(c) => setUpdateForm({ ...updateForm, isMandatory: !!c })}
-                        />
-                        <div className="grid gap-1.5 leading-none cursor-pointer flex-1" onClick={() => setUpdateForm(p => ({ ...p, isMandatory: !p.isMandatory }))}>
-                          <label htmlFor="isMandatory" className="text-sm font-bold leading-none cursor-pointer text-white">
-                            Atualização Obrigatória (Bloqueante)
-                          </label>
-                          <p className="text-[10px] text-white/50">
-                            Se marcado, os usuários não poderão fechar o balão sem clicar em "Atualizar".
-                          </p>
+                    <div>
+                      <div className="text-[10px] font-bold text-white/70 uppercase mb-1 tracking-widest">Status Geral</div>
+                      <div className="flex items-baseline gap-1 mb-2">
+                        <div className="text-xl sm:text-2xl font-bold text-blue-300">
+                          {feedbackStats.approvalRate > 0 ? `${Math.round(feedbackStats.approvalRate)}%` : '---'}
                         </div>
                       </div>
-
-                      <Button 
-                        className="w-full h-12 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-2xl shadow-lg mt-4" 
-                        onClick={handleSaveAppUpdate}
-                        disabled={isSavingUpdate}
-                      >
-                        {isSavingUpdate ? <RefreshCw className="w-5 h-5 animate-spin" /> : "Salvar Configuração e Preparar"}
-                      </Button>
                     </div>
+                    
+                    <div className="space-y-1.5 border-t border-white/5 pt-3">
+                      <div className="flex justify-between items-center text-[8px] uppercase font-bold tracking-widest text-white/30">
+                        <span>Taxa de Aprovação</span>
+                        <span className="text-yellow-400 font-bold flex items-center gap-0.5">
+                          <Star className="w-2 h-2 fill-yellow-400" />
+                          {feedbackStats.average.toFixed(1)}
+                        </span>
+                      </div>
+                      <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ 
+                            width: `${feedbackStats.approvalRate}%`,
+                            backgroundColor: "rgba(250, 204, 21, 0.6)"
+                          }}
+                          className="h-full rounded-full shadow-[0_0_8px_rgba(250,204,21,0.2)]"
+                        />
+                      </div>
+                      <div className="text-[8px] text-white/40 font-bold uppercase tracking-tighter mt-1">
+                        Baseado em {feedbackStats.count} feedbacks
+                      </div>
+                    </div>
+                  </Card>
+
+                  {feedbacks.length === 0 ? (
+                    <div className="text-center py-12 text-white/30 italic text-sm">Nenhum feedback recebido ainda.</div>
+                  ) : (
+                    <div className="space-y-4">
+                      {feedbacks
+                        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+                        .map(fb => (
+                        <div key={fb.id} className="bg-white/5 p-4 sm:p-5 rounded-3xl border border-white/10 space-y-3">
+                        <div className="flex justify-between items-start">
+                          <div className="min-w-0">
+                            <div className="font-bold text-white truncate">{fb.userName}</div>
+                            <div className="text-[10px] text-white/40 truncate">{fb.userEmail}</div>
+                          </div>
+                          <div className="flex bg-yellow-400/10 px-1.5 py-0.5 rounded-lg shrink-0">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Star 
+                                key={star}
+                                className={cn(
+                                  "w-2.5 h-2.5",
+                                  fb.stars >= star ? "text-yellow-400 fill-yellow-400" : "text-white/10"
+                                )} 
+                              />
+                            ))}
+                          </div>
+                        </div>
+                        
+                        <div className="text-xs sm:text-sm text-white/80 leading-relaxed bg-white/5 p-3 s:p-4 rounded-2xl italic border border-white/5">
+                          "{fb.message}"
+                        </div>
+                        
+                        <div className="flex justify-between items-center text-[9px] text-white/30 uppercase tracking-widest font-bold">
+                          <span>ID: {fb.userId.slice(0, 8)}...</span>
+                          <span>{new Date(fb.updatedAt).toLocaleDateString('pt-BR')}</span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
-              </div>
-              
-              <div className="p-6 border-t border-white/10">
-                <Button 
-                  onClick={() => setIsAdminPanelOpen(false)}
-                  className="w-full bg-white text-[#04142c] hover:bg-white/90 font-bold py-6 rounded-2xl text-lg"
-                >
-                  Fechar
-                </Button>
-              </div>
-            </DialogContent>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-2xl">
+                    <div className="flex items-center gap-2 text-blue-400 mb-2 font-bold text-sm">
+                      <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                      Atenção
+                    </div>
+                    <p className="text-xs text-white/70 leading-relaxed">
+                      Os dados aqui preenchidos serão exibidos no balão de atualização do sistema <strong>somente após um novo deploy</strong>. Não force os usuários a atualizar para versões quebradas.
+                    </p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label className="text-xs">Título Menor / Tagline</Label>
+                      <Input 
+                        placeholder="Ex: Nova Funcionalidade!" 
+                        className="bg-white/5 border-white/10 text-white h-11 rounded-xl text-sm"
+                        value={updateForm.title}
+                        onChange={(e) => setUpdateForm({ ...updateForm, title: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Versão</Label>
+                      <Input 
+                        placeholder="Ex: 2.1.0" 
+                        className="bg-white/5 border-white/10 text-white h-11 rounded-xl text-sm"
+                        value={updateForm.version}
+                        onChange={(e) => setUpdateForm({ ...updateForm, version: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs">Changelog (O que mudou)</Label>
+                      <Textarea 
+                        placeholder="Melhorias de estabilidade..." 
+                        className="bg-white/5 border-white/10 text-white min-h-[100px] rounded-xl text-sm"
+                        value={updateForm.changelog}
+                        onChange={(e) => setUpdateForm({ ...updateForm, changelog: e.target.value })}
+                      />
+                    </div>
+                    <div className="flex items-center gap-3 bg-white/5 p-3 border border-white/10 rounded-2xl hover:bg-white/10 transition-colors">
+                      <Checkbox 
+                        id="isMandatory" 
+                        className="border-white/30 data-[state=checked]:bg-red-500 data-[state=checked]:border-red-500" 
+                        checked={updateForm.isMandatory}
+                        onCheckedChange={(c) => setUpdateForm({ ...updateForm, isMandatory: !!c })}
+                      />
+                      <div className="grid gap-1 leading-none cursor-pointer flex-1" onClick={() => setUpdateForm(p => ({ ...p, isMandatory: !p.isMandatory }))}>
+                        <label htmlFor="isMandatory" className="text-xs font-bold leading-none cursor-pointer text-white">
+                          Atualização Obrigatória (Bloqueante)
+                        </label>
+                        <p className="text-[9px] text-white/50">
+                          Se marcado, os usuários não poderão fechar o balão sem clicar em "Atualizar".
+                        </p>
+                      </div>
+                    </div>
+
+                    <Button 
+                      className="w-full h-12 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-2xl shadow-lg mt-2 text-sm" 
+                      onClick={handleSaveAppUpdate}
+                      disabled={isSavingUpdate}
+                    >
+                      {isSavingUpdate ? <RefreshCw className="w-5 h-5 animate-spin" /> : "Salvar Configuração"}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <div className="p-4 sm:p-6 border-t border-white/10 bg-white/5">
+              <Button 
+                onClick={() => setIsAdminPanelOpen(false)}
+                className="w-full bg-white text-[#04142c] hover:bg-white/90 font-bold h-12 sm:h-14 rounded-2xl text-base sm:text-lg"
+              >
+                Fechar
+              </Button>
+            </div>
+          </DialogContent>
           </Dialog>
         </>
       )}

@@ -2,12 +2,12 @@
   "name": "Orin - A organização inteligente",
   "short_name": "Orin",
   "description": "Controle seu salário e despesas mensais de forma simples e independente.",
-  "id": ".",
-  "start_url": "./?source=pwa",
+  "id": "/",
+  "start_url": "/?source=pwa",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#144a95",
-  "theme_color": "#144a95",
+  "background_color": "#04142c",
+  "theme_color": "#04142c",
   "icons": [
     {
       "src": "/icon-192.png",
@@ -26,6 +26,22 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Nova Despesa",
+      "short_name": "Despesa",
+      "description": "Adicionar nova despesa rapidamente",
+      "url": "/?action=add-expense",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Ver Devedores",
+      "short_name": "Devedores",
+      "description": "Visualizar quem te deve",
+      "url": "/?tab=debtors",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     }
   ]
 }
