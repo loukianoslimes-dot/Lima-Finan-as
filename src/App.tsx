@@ -453,14 +453,27 @@ export default function App() {
 
   const [salary, setSalary] = useState<number>(0);
   const [secondarySalary, setSecondarySalary] = useState<number>(0);
+  const [thirteenth1, setThirteenth1] = useState<number>(0);
+  const [thirteenth2, setThirteenth2] = useState<number>(0);
+  
   const [baseSalary, setBaseSalary] = useState<number>(0);
   const [baseSecondarySalary, setBaseSecondarySalary] = useState<number>(0);
-  const [monthlySalaries, setMonthlySalaries] = useState<Record<string, { salary: number, secondarySalary: number }>>({});
+  const [baseThirteenth1, setBaseThirteenth1] = useState<number>(0);
+  const [baseThirteenth2, setBaseThirteenth2] = useState<number>(0);
+  
+  const [monthlySalaries, setMonthlySalaries] = useState<Record<string, { salary: number, secondarySalary: number, thirteenth1?: number, thirteenth2?: number }>>({});
+  
   const [tempSalary, setTempSalary] = useState<number>(0);
   const [tempSecondarySalary, setTempSecondarySalary] = useState<number>(0);
+  const [tempThirteenth1, setTempThirteenth1] = useState<number>(0);
+  const [tempThirteenth2, setTempThirteenth2] = useState<number>(0);
+  
   const [isSalaryApplyModalOpen, setIsSalaryApplyModalOpen] = useState(false);
   const [isTributeModalOpen, setIsTributeModalOpen] = useState(false);
   const [editingTribute, setEditingTribute] = useState<Tribute | null>(null);
+  
+  const [theme, setTheme] = useState<'default' | 'dark'>('default');
+  const [isThemeExpanded, setIsThemeExpanded] = useState(false);
   const [tributes, setTributes] = useState<Tribute[]>([
     { id: "t_dizimo", name: "Dízimo", percentage: 10, base: "total", enabled: false },
     { id: "t_passagem", name: "Passagem", percentage: 6, base: "main", enabled: false },
@@ -741,7 +754,13 @@ export default function App() {
         const data = docSnap.data();
         const cloudSalary = data.salary || 0;
         const cloudSecondarySalary = data.secondarySalary || 0;
+        const cloudThirteenth1 = data.thirteenth1 || 0;
+        const cloudThirteenth2 = data.thirteenth2 || 0;
         const cloudMonthlySalaries = data.monthlySalaries || {};
+        
+        if (data.theme) {
+          setTheme(data.theme);
+        }
         
         let cloudTributes = data.tributes;
         if (!cloudTributes) {
@@ -763,23 +782,33 @@ export default function App() {
         setMonthlySalaries(cloudMonthlySalaries);
         setBaseSalary(cloudSalary);
         setBaseSecondarySalary(cloudSecondarySalary);
+        setBaseThirteenth1(cloudThirteenth1);
+        setBaseThirteenth2(cloudThirteenth2);
 
         const currentMonthStr = currentDate.toISOString().slice(0, 7);
         const currentMonthlyData = cloudMonthlySalaries[currentMonthStr];
 
         setSalary(prev => {
           const target = currentMonthlyData ? currentMonthlyData.salary : cloudSalary;
-          if (prev !== target && !isSavingSalary) {
-            return target;
-          }
+          if (prev !== target && !isSavingSalary) return target;
           return prev;
         });
 
         setSecondarySalary(prev => {
           const target = currentMonthlyData ? currentMonthlyData.secondarySalary : cloudSecondarySalary;
-          if (prev !== target && !isSavingSalary) {
-            return target;
-          }
+          if (prev !== target && !isSavingSalary) return target;
+          return prev;
+        });
+        
+        setThirteenth1(prev => {
+          const target = currentMonthlyData && currentMonthlyData.thirteenth1 !== undefined ? currentMonthlyData.thirteenth1 : cloudThirteenth1;
+          if (prev !== target && !isSavingSalary) return target;
+          return prev;
+        });
+        
+        setThirteenth2(prev => {
+          const target = currentMonthlyData && currentMonthlyData.thirteenth2 !== undefined ? currentMonthlyData.thirteenth2 : cloudThirteenth2;
+          if (prev !== target && !isSavingSalary) return target;
           return prev;
         });
       }
@@ -867,11 +896,15 @@ export default function App() {
     if (mOverride) {
       setSalary(mOverride.salary);
       setSecondarySalary(mOverride.secondarySalary);
+      setThirteenth1(mOverride.thirteenth1 !== undefined ? mOverride.thirteenth1 : baseThirteenth1);
+      setThirteenth2(mOverride.thirteenth2 !== undefined ? mOverride.thirteenth2 : baseThirteenth2);
     } else {
       setSalary(baseSalary);
       setSecondarySalary(baseSecondarySalary);
+      setThirteenth1(baseThirteenth1);
+      setThirteenth2(baseThirteenth2);
     }
-  }, [currentDate, monthlySalaries, baseSalary, baseSecondarySalary, user]);
+  }, [currentDate, monthlySalaries, baseSalary, baseSecondarySalary, baseThirteenth1, baseThirteenth2, user]);
 
   const updateSalaryOrder = async (newOrder: AdditionalSalary[]) => {
     setDisplayAdditionalSalaries(newOrder);
@@ -914,10 +947,12 @@ export default function App() {
       if (option === 'all') {
         updateData.salary = tempSalary;
         updateData.secondarySalary = tempSecondarySalary;
+        updateData.thirteenth1 = tempThirteenth1;
+        updateData.thirteenth2 = tempThirteenth2;
         updateData.monthlySalaries = {}; 
       } else if (option === 'current') {
         const newMonthly = { ...monthlySalaries };
-        newMonthly[currentMonthStr] = { salary: tempSalary, secondarySalary: tempSecondarySalary };
+        newMonthly[currentMonthStr] = { salary: tempSalary, secondarySalary: tempSecondarySalary, thirteenth1: tempThirteenth1, thirteenth2: tempThirteenth2 };
         updateData.monthlySalaries = newMonthly;
       } else if (option === 'future') {
         const newMonthly = { ...monthlySalaries };
@@ -929,19 +964,21 @@ export default function App() {
 
         monthsWithActivity.forEach(mStr => {
           if (!newMonthly[mStr]) {
-            newMonthly[mStr] = { salary: baseSalary, secondarySalary: baseSecondarySalary };
+            newMonthly[mStr] = { salary: baseSalary, secondarySalary: baseSecondarySalary, thirteenth1: baseThirteenth1, thirteenth2: baseThirteenth2 };
           }
         });
 
-        newMonthly[currentMonthStr] = { salary: tempSalary, secondarySalary: tempSecondarySalary };
+        newMonthly[currentMonthStr] = { salary: tempSalary, secondarySalary: tempSecondarySalary, thirteenth1: tempThirteenth1, thirteenth2: tempThirteenth2 };
         Object.keys(newMonthly).forEach(mStr => {
           if (mStr > currentMonthStr) {
-            newMonthly[mStr] = { salary: tempSalary, secondarySalary: tempSecondarySalary };
+            newMonthly[mStr] = { salary: tempSalary, secondarySalary: tempSecondarySalary, thirteenth1: tempThirteenth1, thirteenth2: tempThirteenth2 };
           }
         });
 
         updateData.salary = tempSalary;
         updateData.secondarySalary = tempSecondarySalary;
+        updateData.thirteenth1 = tempThirteenth1;
+        updateData.thirteenth2 = tempThirteenth2;
         updateData.monthlySalaries = newMonthly;
       }
 
@@ -1803,14 +1840,14 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
   }, [filteredAdditionalSalaries]);
 
   const { grossIncome, totalIncome, totalTributesDiscount } = useMemo(() => {
-    const grossTotal = salary + secondarySalary + totalAdditionalSalary;
+    const grossTotal = salary + secondarySalary + thirteenth1 + thirteenth2 + totalAdditionalSalary;
     
     let totalDiscount = 0;
     
     tributes.forEach(t => {
       if (t.enabled) {
         if (t.base === 'main') {
-          totalDiscount += salary * (t.percentage / 100);
+          totalDiscount += (salary + thirteenth1 + thirteenth2 + secondarySalary) * (t.percentage / 100);
         } else {
           totalDiscount += grossTotal * (t.percentage / 100);
         }
@@ -1822,7 +1859,7 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
       totalIncome: grossTotal - totalDiscount,
       totalTributesDiscount: totalDiscount
     };
-  }, [salary, secondarySalary, totalAdditionalSalary, tributes]);
+  }, [salary, secondarySalary, thirteenth1, thirteenth2, totalAdditionalSalary, tributes]);
 
   const { totalMonthlyExpenses, totalPaidExpenses, totalRemainingExpenses } = useMemo(() => {
     const currentMonthStr = currentDate.toISOString().slice(0, 7);
@@ -1848,6 +1885,17 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
   }, [filteredExpenses, currentDate, debtors]);
 
   const balance = totalIncome - totalMonthlyExpenses;
+
+  const handleThemeChange = async (newTheme: 'default' | 'dark') => {
+    setTheme(newTheme);
+    if (!user) return;
+    const settingsPath = `users/${user.uid}/settings/main`;
+    try {
+      await setDoc(doc(db, settingsPath), { theme: newTheme }, { merge: true });
+    } catch (error) {
+      console.error("Error saving theme:", error);
+    }
+  };
 
   // Logic for dynamic balance messages
   const balanceMessage = useMemo(() => {
@@ -1878,13 +1926,13 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
       }
     });
 
-    const prevGrossTotalIncome = salary + secondarySalary + prevAdditionalSalary;
+    const prevGrossTotalIncome = salary + secondarySalary + thirteenth1 + thirteenth2 + prevAdditionalSalary;
     
     let totalDiscount = 0;
     tributes.forEach(t => {
       if (t.enabled) {
         if (t.base === 'main') {
-          totalDiscount += salary * (t.percentage / 100);
+          totalDiscount += (salary + thirteenth1 + thirteenth2 + secondarySalary) * (t.percentage / 100);
         } else {
           totalDiscount += prevGrossTotalIncome * (t.percentage / 100);
         }
@@ -2444,10 +2492,25 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
         .reduce((acc, curr) => acc + curr.value, 0);
 
       const mOverride = monthlySalaries[mStr];
-      const mSalary = mOverride ? mOverride.salary : salary;
-      const mSecondary = mOverride ? mOverride.secondarySalary : secondarySalary;
+      const mSalary = mOverride ? mOverride.salary : baseSalary;
+      const mSecondary = mOverride ? mOverride.secondarySalary : baseSecondarySalary;
+      const mThirteenth1 = mOverride && mOverride.thirteenth1 !== undefined ? mOverride.thirteenth1 : baseThirteenth1;
+      const mThirteenth2 = mOverride && mOverride.thirteenth2 !== undefined ? mOverride.thirteenth2 : baseThirteenth2;
 
-      const monthTotalIncome = mSalary + mSecondary + mAdditional;
+      const grossMonthIncome = mSalary + mSecondary + mThirteenth1 + mThirteenth2 + mAdditional;
+      
+      let mDiscount = 0;
+      tributes.forEach(t => {
+        if (t.enabled) {
+          if (t.base === 'main') {
+            mDiscount += (mSalary + mThirteenth1 + mThirteenth2 + mSecondary) * (t.percentage / 100);
+          } else {
+            mDiscount += grossMonthIncome * (t.percentage / 100);
+          }
+        }
+      });
+      
+      const monthTotalIncome = grossMonthIncome - mDiscount;
       const monthBalance = monthTotalIncome - mExpenses;
       const monthEfficiency = monthTotalIncome > 0 ? Math.max(0, Math.round((monthBalance / monthTotalIncome) * 100)) : 0;
 
@@ -2484,7 +2547,10 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
   }, [expenses, additionalSalaries, salary, reportRange]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#010409] to-[#04142c] text-white p-4 md:p-8 font-sans overflow-x-hidden">
+    <div className={cn(
+      "min-h-screen text-white p-4 md:p-8 font-sans overflow-x-hidden",
+      theme === 'dark' ? "bg-gradient-to-br from-black to-zinc-950" : "bg-gradient-to-br from-[#010409] to-[#04142c]"
+    )}>
       <div 
         className="max-w-3xl mx-auto w-full space-y-6 pb-24 pt-24"
         style={{ zoom: zoomLevel } as React.CSSProperties}
@@ -2659,6 +2725,8 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
                           onClick={() => {
                             setTempSalary(salary);
                             setTempSecondarySalary(secondarySalary);
+                            setTempThirteenth1(thirteenth1);
+                            setTempThirteenth2(thirteenth2);
                             setIsSalaryModalOpen(true);
                           }}
                         >
@@ -2668,7 +2736,7 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
                               <div className="w-2.5 h-2.5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
                             )}
                           </div>
-                          <span className="text-white/60 font-bold group-hover:text-white transition-colors">{formatCurrency(salary + secondarySalary)}</span>
+                          <span className="text-white/60 font-bold group-hover:text-white transition-colors">{formatCurrency(salary + secondarySalary + thirteenth1 + thirteenth2)}</span>
                         </div>
                         <div 
                           className="flex justify-between items-center text-[10px] sm:text-[12px] uppercase tracking-tight cursor-pointer hover:bg-white/10 p-1.5 rounded-lg transition-all group"
@@ -3292,7 +3360,7 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
               </div>
             </motion.div>
           </motion.div>
-        ) : (
+        ) : activeTab === "report" ? (
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -3610,7 +3678,7 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
               </div>
             </div>
           </motion.div>
-        )}
+        ) : null}
 
         {activeTab === "settings" && (
           <motion.div 
@@ -3625,28 +3693,81 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
               </h2>
               
               <div className="space-y-8">
-                {/* Scale Controls */}
+                {/* Visual Area */}
                 <div className="flex flex-col gap-3">
-                  <h3 className="text-sm font-bold text-white/50 uppercase tracking-widest">Escala da Interface</h3>
-                  <div className="flex items-center gap-4">
+                  <h3 className="text-sm font-bold text-white/50 uppercase tracking-widest">Visual</h3>
+                  
+                  {/* Theme Customizer */}
+                  <div 
+                    className="liquid-glass rounded-2xl border border-white/10 overflow-hidden cursor-pointer group"
+                    onClick={() => setIsThemeExpanded(!isThemeExpanded)}
+                  >
+                    <div className="p-4 flex justify-between items-center bg-white/5 group-hover:bg-white/10 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-xl bg-blue-500/20 text-blue-400">
+                          <Palette className="w-5 h-5" />
+                        </div>
+                        <span className="font-bold">Personalizar Tema</span>
+                      </div>
+                      <motion.div animate={{ rotate: isThemeExpanded ? 180 : 0 }}>
+                        <ChevronDown className="w-5 h-5 text-white/50 group-hover:text-white transition-colors" />
+                      </motion.div>
+                    </div>
+                    
+                    <AnimatePresence>
+                      {isThemeExpanded && (
+                        <motion.div 
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="border-t border-white/10"
+                        >
+                          <div className="p-4 grid grid-cols-2 gap-3" onClick={e => e.stopPropagation()}>
+                            <div 
+                              onClick={() => handleThemeChange('default')}
+                              className={cn(
+                                "flex flex-col items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all",
+                                theme === 'default' ? "border-blue-400 bg-blue-500/10" : "border-white/5 hover:border-white/20 hover:bg-white/5"
+                              )}
+                            >
+                              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#010409] to-[#04142c] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.2)]" />
+                              <span className={cn("text-xs font-bold uppercase tracking-widest", theme === 'default' ? "text-blue-300" : "text-white/50")}>Padrão</span>
+                            </div>
+                            <div 
+                              onClick={() => handleThemeChange('dark')}
+                              className={cn(
+                                "flex flex-col items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all",
+                                theme === 'dark' ? "border-blue-400 bg-blue-500/10" : "border-white/5 hover:border-white/20 hover:bg-white/5"
+                              )}
+                            >
+                              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-black to-zinc-950 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.2)]" />
+                              <span className={cn("text-xs font-bold uppercase tracking-widest", theme === 'dark' ? "text-blue-300" : "text-white/50")}>Escuro</span>
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+                  {/* Scale Controls */}
+                  <div className="flex items-center gap-4 mt-2">
+                    <span className="text-xs font-bold text-white/50 uppercase tracking-widest flex-1">Escala da Interface</span>
                     <Button
                       variant="outline"
-                      className="h-12 flex-1 rounded-2xl bg-white/5 border-white/10 hover:bg-white/10 text-white gap-2"
+                      className="h-10 px-4 rounded-xl bg-white/5 border-white/10 hover:bg-white/10 text-white gap-2"
                       onClick={() => setZoomLevel(prev => Math.max(prev - 0.1, 0.7))}
                     >
-                      <Minus className="w-5 h-5" />
-                      Diminuir
+                      <Minus className="w-4 h-4" />
                     </Button>
-                    <div className="w-16 text-center font-bold text-lg text-white">
+                    <div className="w-12 text-center font-bold text-sm text-white">
                       {Math.round(zoomLevel * 100)}%
                     </div>
                     <Button
                       variant="outline"
-                      className="h-12 flex-1 rounded-2xl bg-white/5 border-white/10 hover:bg-white/10 text-white gap-2"
+                      className="h-10 px-4 rounded-xl bg-white/5 border-white/10 hover:bg-white/10 text-white gap-2"
                       onClick={() => setZoomLevel(prev => Math.min(prev + 0.1, 1.5))}
                     >
-                      <Plus className="w-5 h-5" />
-                      Aumentar
+                      <Plus className="w-4 h-4" />
                     </Button>
                   </div>
                 </div>
@@ -3774,7 +3895,7 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 bg-[#04142c]/80 backdrop-blur-sm z-[60]"
+                        className={cn("fixed inset-0 backdrop-blur-sm z-[60]", theme === 'dark' ? "bg-zinc-950/80" : "bg-[#04142c]/80")}
                         onClick={() => setIsSpeedDialOpen(false)}
                       />
                       
@@ -3902,6 +4023,22 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
               </div>
             </div>
 
+            <div className="grid gap-2 pl-4 border-l-2 border-white/10">
+              <Label htmlFor="modal-thirteenth1" className="text-white/70">13º - 1ª parcela</Label>
+              <div className="relative">
+                <Input
+                  id="modal-thirteenth1"
+                  type="text"
+                  inputMode="numeric"
+                  value={formatCurrencyInput(tempThirteenth1)}
+                  onChange={(e) => setTempThirteenth1(parseCurrencyInput(e.target.value))}
+                  className="bg-white/10 border-white/10 text-white pl-10 h-12 rounded-xl focus:ring-blue-500"
+                  placeholder="0,00"
+                />
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 font-bold">R$</span>
+              </div>
+            </div>
+
             <div className="grid gap-2">
               <Label htmlFor="modal-secondarySalary" className="text-white/70">Salário Adicional</Label>
               <div className="relative">
@@ -3918,10 +4055,26 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
               </div>
             </div>
 
+            <div className="grid gap-2 pl-4 border-l-2 border-white/10">
+              <Label htmlFor="modal-thirteenth2" className="text-white/70">13º - 2ª parcela</Label>
+              <div className="relative">
+                <Input
+                  id="modal-thirteenth2"
+                  type="text"
+                  inputMode="numeric"
+                  value={formatCurrencyInput(tempThirteenth2)}
+                  onChange={(e) => setTempThirteenth2(parseCurrencyInput(e.target.value))}
+                  className="bg-white/10 border-white/10 text-white pl-10 h-12 rounded-xl focus:ring-blue-500"
+                  placeholder="0,00"
+                />
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 font-bold">R$</span>
+              </div>
+            </div>
+
             <div className="bg-white/10 p-4 rounded-2xl border border-white/10 flex justify-between items-center">
               <span className="text-sm text-white/70 uppercase font-bold tracking-wider">Total Mensal</span>
               <span className="text-2xl font-bold text-blue-300">
-                {(tempSalary + tempSecondarySalary).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                {(tempSalary + tempSecondarySalary + tempThirteenth1 + tempThirteenth2).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
               </span>
             </div>
           </div>
@@ -3980,7 +4133,7 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
       {/* Tribute Modal */}
       <Dialog open={isTributeModalOpen} onOpenChange={setIsTributeModalOpen}>
         <DialogContent 
-          className="bg-[#04142c] sm:bg-white/10 sm:backdrop-blur-2xl border-white/10 text-white w-full h-[100dvh] sm:h-auto sm:max-w-[425px] sm:rounded-3xl p-0 sm:p-6 flex flex-col m-0 max-w-none"
+          className={cn("sm:bg-white/10 sm:backdrop-blur-2xl border-white/10 text-white w-full h-[100dvh] sm:h-auto sm:max-w-[425px] sm:rounded-3xl p-0 sm:p-6 flex flex-col m-0 max-w-none", theme === 'dark' ? "bg-zinc-950" : "bg-[#04142c]")}
         >
           <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-6">
             <DialogHeader className="text-left flex-shrink-0">
@@ -4972,7 +5125,7 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
       </Dialog>
       {/* Discard Changes Confirmation */}
       <Dialog open={showDiscardConfirm} onOpenChange={setShowDiscardConfirm}>
-        <DialogContent className="bg-[#04142c]/90 backdrop-blur-2xl border-white/10 text-white rounded-[2rem] w-[90vw] sm:max-w-sm">
+        <DialogContent className={cn("backdrop-blur-2xl border-white/10 text-white rounded-[2rem] w-[90vw] sm:max-w-sm", theme === 'dark' ? "bg-zinc-950/90" : "bg-[#04142c]/90")}>
           <DialogHeader>
             <DialogTitle className="text-xl font-bold flex items-center gap-2">
               <ShieldAlert className="w-6 h-6 text-yellow-400" />
@@ -5077,7 +5230,7 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
           </button>
 
           <Dialog open={isAdminPanelOpen} onOpenChange={setIsAdminPanelOpen}>
-            <DialogContent className="bg-[#04142c]/95 backdrop-blur-3xl border-white/10 text-white rounded-[2rem] w-[95vw] sm:max-w-xl max-h-[85vh] flex flex-col p-0 overflow-hidden">
+            <DialogContent className={cn("backdrop-blur-3xl border-white/10 text-white rounded-[2rem] w-[95vw] sm:max-w-xl max-h-[85vh] flex flex-col p-0 overflow-hidden", theme === 'dark' ? "bg-zinc-950/95" : "bg-[#04142c]/95")}>
               <div className="p-6 border-b border-white/10">
                 <DialogHeader>
                   <DialogTitle className="text-2xl font-bold flex items-center gap-3">
