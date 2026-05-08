@@ -2773,11 +2773,20 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
       )}
 
     <div className={cn(
-      "min-h-screen text-white p-4 md:p-8 font-sans overflow-x-hidden",
-      theme === 'dark' ? "bg-gradient-to-br from-black to-zinc-950" : "bg-gradient-to-br from-[#010409] to-[#04142c]"
+      "min-h-screen text-white p-4 md:p-8 overflow-x-hidden relative",
     )}>
+      {/* Dynamic Glassmorphism Background */}
+      <div className="fixed inset-0 z-[-1] overflow-hidden pointer-events-none">
+        {/* Colorful shapes */}
+        <div className="absolute top-[-10%] left-[-10%] w-[60vw] h-[60vw] bg-indigo-500/40 rounded-full mix-blend-color-dodge filter blur-[100px] opacity-70 animate-pulse" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[70vw] h-[70vw] bg-rose-500/40 rounded-full mix-blend-color-dodge filter blur-[120px] opacity-70" style={{ animationDelay: '2s' }} />
+        <div className="absolute top-[20%] left-[50%] w-[50vw] h-[50vw] bg-emerald-500/40 rounded-full mix-blend-color-dodge filter blur-[100px] opacity-60" style={{ animationDelay: '1s' }} />
+        {/* Background base and deep blur */}
+        <div className="absolute inset-0 bg-neutral-900/60 backdrop-blur-[80px]" />
+      </div>
+
       <div 
-        className="max-w-3xl mx-auto w-full space-y-6 pb-24 pt-24"
+        className="max-w-3xl mx-auto w-full space-y-6 pb-24 pt-24 relative z-10"
         style={{ zoom: zoomLevel } as React.CSSProperties}
       >
         {/* Auth Loading State */}
