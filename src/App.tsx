@@ -140,7 +140,7 @@ interface AppUser {
   id: string;
   name: string;
   email: string;
-  status: 'pending' | 'active' | 'rejected';
+  status: 'pending' | 'active' | 'rejected' | 'removed';
   createdAt: string;
 }
 
@@ -591,6 +591,7 @@ export default function App() {
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
   const [userFeedback, setUserFeedback] = useState<any | null>(null);
   const [adminTab, setAdminTab] = useState<'users' | 'feedbacks' | 'updates'>('users');
+  const [adminSubTab, setAdminSubTab] = useState<'pending' | 'active' | 'rejected' | 'removed'>('pending');
   const [updateForm, setUpdateForm] = useState<AppUpdateInfo>({
     title: '',
     version: '',
@@ -2834,7 +2835,7 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
               <p className="text-blue-300/60">Dica: Você pode instalar este app no seu celular para acesso rápido!</p>
             </div>
           </motion.div>
-        ) : !isAdmin && (appUserStatus === 'pending' || appUserStatus === 'rejected') ? (
+        ) : !isAdmin && (appUserStatus === 'pending' || appUserStatus === 'rejected' || appUserStatus === 'removed') ? (
           /* Blocked Screen */
           <motion.div 
             initial={{ opacity: 0, scale: 0.9 }}
@@ -2843,18 +2844,24 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
           >
             <div className="space-y-4">
               <div className="liquid-glass p-6 rounded-3xl inline-block mx-auto relative group">
-                <ShieldAlert className="w-16 h-16 text-yellow-500" />
+                {appUserStatus === 'pending' ? (
+                  <ShieldCheck className="w-16 h-16 text-yellow-500" />
+                ) : (
+                  <ShieldAlert className="w-16 h-16 text-red-500" />
+                )}
               </div>
               <h1 className="text-3xl font-bold tracking-tight">O acesso não foi autorizado</h1>
               <p className="text-white/70 max-w-sm mx-auto">
                 {appUserStatus === 'pending' 
                   ? "Sua conta está aguardando aprovação. Um administrador precisa liberar seu acesso." 
+                  : appUserStatus === 'removed'
+                  ? "Sua conta foi removida pelo administrador. Entre em contato para mais informações."
                   : "Sua solicitação de acesso foi recusada. Você pode tentar reenviar o pedido."}
               </p>
             </div>
             
             <div className="flex flex-col gap-4 w-full max-w-xs">
-              {appUserStatus === 'rejected' && (
+              {(appUserStatus === 'rejected' || appUserStatus === 'removed') && (
                 <Button 
                   onClick={() => handleUpdateAppUserStatus(user.uid, 'pending')}
                   className="bg-blue-500 text-white hover:bg-blue-600 font-bold px-8 py-6 rounded-2xl text-lg shadow-2xl flex items-center justify-center gap-3 transition-all hover:scale-105"
@@ -2964,10 +2971,26 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
                             setIsSalaryModalOpen(true);
                           }}
                         >
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-white/40 group-hover:text-white/70 transition-colors">Salários:</span>
-                            {isSavingSalary && (
+                          <div className="flex items-center gap-1.5 text-white/40 group-hover:text-white/70 transition-colors">
+                            <span>Salários:</span>
+                            {isSavingSalary ? (
                               <div className="w-2.5 h-2.5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                            ) : (
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={(e) => { 
+                                  e.stopPropagation();
+                                  setTempSalary(salary);
+                                  setTempSecondarySalary(secondarySalary);
+                                  setTempThirteenth1(thirteenth1);
+                                  setTempThirteenth2(thirteenth2);
+                                  setIsSalaryModalOpen(true);
+                                }}
+                                className="h-4 w-4 rounded-full bg-white/10 text-white hover:bg-white/20 ml-1"
+                              >
+                                <Plus className="w-2.5 h-2.5" />
+                              </Button>
                             )}
                           </div>
                           <span className="text-white/60 font-bold group-hover:text-white transition-colors">{formatCurrency(salary + secondarySalary + thirteenth1 + thirteenth2)}</span>
@@ -5548,7 +5571,7 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
                       adminTab === 'users' ? "bg-white text-[#04142c] shadow-lg" : "text-white/40 hover:text-white/60"
                     )}
                   >
-                    Usuários
+                    Solicitações
                   </button>
                   <button
                     onClick={() => setAdminTab('feedbacks')}
@@ -5573,53 +5596,88 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
               
               <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
                 {adminTab === 'users' ? (
-                  allAppUsers.length === 0 ? (
-                    <div className="text-center py-12 text-white/30 italic">Nenhum usuário encontrado.</div>
-                  ) : (
-                    <div className="space-y-3">
-                      {allAppUsers.map(userItem => (
-                        <div key={userItem.id} className="bg-white/5 p-4 rounded-2xl border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                          <div className="flex-1">
-                            <div className="font-bold flex items-center justify-between sm:justify-start gap-2">
-                              {userItem.name}
-                              <span className={cn(
-                                "text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider font-bold border",
-                                userItem.status === 'active' ? "bg-green-500/10 border-green-500/20 text-green-400" :
-                                userItem.status === 'pending' ? "bg-yellow-500/10 border-yellow-500/20 text-yellow-400" :
-                                "bg-red-500/10 border-red-500/20 text-red-400"
-                              )}>
-                                {userItem.status === 'active' ? 'Ativo' : userItem.status === 'pending' ? 'Pendente' : 'Recusado'}
-                              </span>
-                            </div>
-                            <div className="text-sm text-white/60">{userItem.email}</div>
-                          </div>
-                          
-                          <div className="flex gap-2 w-full sm:w-auto">
-                            {userItem.status !== 'active' && (
-                              <Button 
-                                size="sm"
-                                onClick={() => handleUpdateAppUserStatus(userItem.id, 'active')}
-                                className="flex-1 sm:flex-none bg-green-500/20 hover:bg-green-500/30 text-green-400 font-bold border border-green-500/30"
-                              >
-                                <CheckCircle className="w-4 h-4 mr-1" />
-                                Aprovar
-                              </Button>
-                            )}
-                            {userItem.status !== 'rejected' && (
-                              <Button 
-                                size="sm"
-                                onClick={() => handleUpdateAppUserStatus(userItem.id, 'rejected')}
-                                className="flex-1 sm:flex-none bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold border border-red-500/30"
-                              >
-                                <XCircle className="w-4 h-4 mr-1" />
-                                Recusar
-                              </Button>
-                            )}
-                          </div>
-                        </div>
+                  <div className="space-y-6">
+                    <div className="flex gap-2 bg-white/5 p-1 rounded-xl border border-white/5 overflow-x-auto custom-scrollbar no-scrollbar scroll-smooth">
+                      {[
+                        { id: 'pending', label: 'Pendentes' },
+                        { id: 'active', label: 'Aprovadas' },
+                        { id: 'rejected', label: 'Recusados' },
+                        { id: 'removed', label: 'Removidos' }
+                      ].map((subTab) => (
+                        <button
+                          key={subTab.id}
+                          onClick={() => setAdminSubTab(subTab.id as any)}
+                          className={cn(
+                            "flex-1 min-w-[90px] py-2 rounded-lg font-bold text-[9px] uppercase tracking-wider transition-all",
+                            adminSubTab === subTab.id ? "bg-blue-500 text-white shadow-md" : "text-white/30 hover:text-white/50"
+                          )}
+                        >
+                          {subTab.label}
+                        </button>
                       ))}
                     </div>
-                  )
+
+                    {allAppUsers.filter(u => u.status === adminSubTab).length === 0 ? (
+                      <div className="text-center py-12 text-white/30 italic">Nenhum usuário nesta categoria.</div>
+                    ) : (
+                      <div className="space-y-3">
+                        {allAppUsers
+                          .filter(u => u.status === adminSubTab)
+                          .map(userItem => (
+                          <div key={userItem.id} className="bg-white/5 p-4 rounded-2xl border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div className="flex-1">
+                              <div className="font-bold flex items-center justify-between sm:justify-start gap-2">
+                                {userItem.name}
+                                <span className={cn(
+                                  "text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider font-bold border",
+                                  userItem.status === 'active' ? "bg-green-500/10 border-green-500/20 text-green-400" :
+                                  userItem.status === 'pending' ? "bg-yellow-500/10 border-yellow-500/20 text-yellow-400" :
+                                  userItem.status === 'removed' ? "bg-zinc-500/10 border-zinc-500/20 text-zinc-400" :
+                                  "bg-red-500/10 border-red-500/20 text-red-400"
+                                )}>
+                                  {userItem.status === 'active' ? 'Aprovado' : userItem.status === 'pending' ? 'Pendente' : userItem.status === 'removed' ? 'Removido' : 'Recusado'}
+                                </span>
+                              </div>
+                              <div className="text-sm text-white/60">{userItem.email}</div>
+                            </div>
+                            
+                            <div className="flex gap-2 w-full sm:w-auto">
+                              {(userItem.status === 'pending' || userItem.status === 'rejected' || userItem.status === 'removed') && (
+                                <Button 
+                                  size="sm"
+                                  onClick={() => handleUpdateAppUserStatus(userItem.id, 'active')}
+                                  className="flex-1 sm:flex-none bg-green-500/20 hover:bg-green-500/30 text-green-400 font-bold border border-green-500/30"
+                                >
+                                  <CheckCircle className="w-4 h-4 mr-1" />
+                                  Aprovar
+                                </Button>
+                              )}
+                              {userItem.status === 'pending' && (
+                                <Button 
+                                  size="sm"
+                                  onClick={() => handleUpdateAppUserStatus(userItem.id, 'rejected')}
+                                  className="flex-1 sm:flex-none bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold border border-red-500/30"
+                                >
+                                  <XCircle className="w-4 h-4 mr-1" />
+                                  Recusar
+                                </Button>
+                              )}
+                              {userItem.status === 'active' && (
+                                <Button 
+                                  size="sm"
+                                  onClick={() => handleUpdateAppUserStatus(userItem.id, 'removed')}
+                                  className="flex-1 sm:flex-none bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold border border-red-500/30"
+                                >
+                                  <Trash2 className="w-4 h-4 mr-1" />
+                                  Remover
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 ) : adminTab === 'feedbacks' ? (
                   <div className="space-y-6">
                     <Card className="liquid-glass text-white overflow-hidden relative p-4 rounded-2xl flex flex-col justify-between">
