@@ -157,4 +157,19 @@
   .liquid-glass-hover {
     @apply hover:bg-white/20 hover:border-white/30 hover:shadow-white/5;
   }
+
+  @keyframes blink-red {
+    0%, 100% { 
+      background-color: rgba(255, 255, 255, 0.05); 
+      border-color: rgba(255, 255, 255, 0.1);
+    }
+    50% { 
+      background-color: rgba(239, 68, 68, 0.2); 
+      border-color: rgba(239, 68, 68, 0.5);
+    }
+  }
+
+  .animate-blink-red {
+    animation: blink-red 2s infinite ease-in-out;
+  }
 }

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'lima-financas-cache-v5';
+const CACHE_NAME = 'orin-cache-v1';
 const DYNAMIC_ICON_CACHE = 'dynamic-icons';
 
 const urlsToCache = [
@@ -32,7 +32,7 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
-  // Intercept icon requests to serve dynamic user profile picture
+  // Intercept icon requests to serve dynamic user profile picture or admin app icon
   if (url.pathname === '/icon-192.png' || url.pathname === '/icon-512.png') {
     event.respondWith(
       caches.open(DYNAMIC_ICON_CACHE).then(cache => {
@@ -40,8 +40,9 @@ self.addEventListener('fetch', event => {
           if (response) {
             return response;
           }
-          // Fallback to a default icon if no profile pic is cached
-          return fetch('https://picsum.photos/seed/finance/192/192');
+          // Fallback to a default icon if no profile pic or admin icon is cached
+          // Using a higher quality default for the icon fallback
+          return fetch('https://picsum.photos/seed/finance/512/512');
         });
       })
     );

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Plus, Trash2, Edit2, Wallet, ArrowUpCircle, ArrowDownCircle, ChevronLeft, ChevronRight, ChevronDown, Calendar as CalendarIcon, BarChart3, Home, PieChart, TrendingUp, LogOut, LogIn, AlertCircle, GripVertical, Share2, Copy, Check, Download, Camera, Target, User as UserIcon } from "lucide-react";
+import { Plus, Trash2, Edit2, Wallet, ArrowUpCircle, ArrowDownCircle, ChevronLeft, ChevronRight, ChevronDown, Calendar as CalendarIcon, BarChart3, Home, PieChart, TrendingUp, LogOut, LogIn, AlertCircle, GripVertical, Share2, Copy, Check, Download, Camera, Target, User as UserIcon, UserPlus, Banknote, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   BarChart, 
@@ -81,6 +81,7 @@ interface AdditionalSalary {
   description: string;
   date: string; // ISO string
   order?: number;
+  debtorId?: string; // ID of the debtor if it came from a settled debtor
 }
 
 interface Debtor {
@@ -98,6 +99,7 @@ interface Debtor {
   receivedMonths?: string[];
   order?: number;
   installmentIndex?: number;
+  addedToExtras?: boolean;
 }
 
 const DEFAULT_CATEGORIES = [
@@ -143,7 +145,9 @@ const DebtorItem: React.FC<DebtorItemProps> = ({
       exit={{ opacity: 0 }}
       className={cn(
         "group bg-white/5 hover:bg-white/10 backdrop-blur-md transition-colors p-4 rounded-2xl border border-white/10 flex items-center justify-between gap-4",
-        debtor.isReceived && "bg-green-500/20 border-green-500/40 shadow-[0_0_15px_rgba(34,197,94,0.1)]"
+        debtor.isReceived 
+          ? "bg-green-500/20 border-green-500/40 shadow-[0_0_15px_rgba(34,197,94,0.1)]" 
+          : "animate-blink-red"
       )}
     >
       <div className="flex items-center gap-4 flex-1 min-w-0">
@@ -316,6 +320,7 @@ interface AdditionalSalaryItemProps {
   onDelete: (id: string) => void;
   formatCurrency: (val: number) => string;
   formatDate: (dateStr: string) => string;
+  onViewDebtorInfo?: (debtorId: string) => void;
 }
 
 const AdditionalSalaryItem: React.FC<AdditionalSalaryItemProps> = ({ 
@@ -323,7 +328,8 @@ const AdditionalSalaryItem: React.FC<AdditionalSalaryItemProps> = ({
   onEdit, 
   onDelete, 
   formatCurrency, 
-  formatDate 
+  formatDate,
+  onViewDebtorInfo
 }) => {
   const { symbol, amount } = formatCurrencyParts(salary.value);
 
@@ -335,36 +341,49 @@ const AdditionalSalaryItem: React.FC<AdditionalSalaryItemProps> = ({
       className="group bg-white/5 hover:bg-white/10 p-3 rounded-2xl transition-colors border border-white/10 flex items-center gap-4"
     >
       <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onEdit(salary)}>
-        <div className="text-[10px] font-bold text-white/40 uppercase tracking-wider mb-0.5">Rendimento Extra</div>
+        <div className="text-[10px] font-bold text-white/40 uppercase tracking-wider mb-0.5 flex items-center gap-1.5">
+          Rendimento Extra
+          {salary.debtorId && (
+            <span 
+              className="text-blue-300 hover:text-blue-200 underline cursor-pointer normal-case bg-blue-500/10 px-2 py-0.5 rounded-full"
+              onClick={(e) => {
+                e.stopPropagation();
+                onViewDebtorInfo?.(salary.debtorId!);
+              }}
+            >
+              (lançado dos devedores)
+            </span>
+          )}
+        </div>
         <div className="font-bold text-white truncate">{salary.description}</div>
         <div className="text-[10px] text-white/30 mt-0.5">
           {formatDate(salary.date)}
         </div>
       </div>
 
-      <div className="flex items-center gap-3 ml-auto">
-        <div className="text-right shrink-0">
+      <div className="flex items-center gap-3 ml-auto shrink-0">
+        <div className="text-right">
           <div className="font-bold text-green-300 flex items-baseline gap-1">
             <span className="text-[10px] opacity-50">{symbol}</span>
-            <span className="text-lg whitespace-nowrap">{amount}</span>
+            <span className="text-base sm:text-lg whitespace-nowrap">{amount}</span>
           </div>
         </div>
-        <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex flex-col sm:flex-row gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
           <Button 
             variant="ghost" 
             size="icon" 
-            className="h-7 w-7 text-white/70 hover:text-white hover:bg-white/10"
+            className="h-8 w-8 text-white/70 hover:text-white hover:bg-white/10"
             onClick={(e) => { e.stopPropagation(); onEdit(salary); }}
           >
-            <Edit2 className="w-3.5 h-3.5" />
+            <Edit2 className="w-4 h-4" />
           </Button>
           <Button 
             variant="ghost" 
             size="icon" 
-            className="h-7 w-7 text-red-400 hover:text-red-300 hover:bg-red-500/10"
+            className="h-8 w-8 text-red-400 hover:text-red-300 hover:bg-red-500/10"
             onClick={(e) => { e.stopPropagation(); onDelete(salary.id); }}
           >
-            <Trash2 className="w-3.5 h-3.5" />
+            <Trash2 className="w-4 h-4" />
           </Button>
         </div>
       </div>
@@ -454,8 +473,8 @@ export default function App() {
 
   // Update PWA icons dynamically and cache for Service Worker
   useEffect(() => {
-    // Priority: User profile picture > Admin custom icon > Default icon
-    const iconUrl = userPhotoUrl || systemConfig.appIconUrl || "https://picsum.photos/seed/finance/192/192";
+    // Priority: Admin custom icon (App Identity) > User profile picture > Default icon
+    const iconUrl = systemConfig.appIconUrl || userPhotoUrl || "/icon-192.png";
     
     const updateLink = (rel: string, href: string) => {
       let link = document.querySelector(`link[rel="${rel}"]`) as HTMLLinkElement;
@@ -467,11 +486,22 @@ export default function App() {
       link.href = href;
     };
 
+    const updateMeta = (property: string, content: string) => {
+      let meta = document.querySelector(`meta[property="${property}"]`) || document.querySelector(`meta[name="${property}"]`);
+      if (meta) {
+        meta.setAttribute('content', content);
+      }
+    };
+
     updateLink('icon', iconUrl);
     updateLink('apple-touch-icon', iconUrl);
+    
+    // Attempt to update social tags (scrapers may ignore, but good for client-side visibility)
+    updateMeta('og:image', iconUrl);
+    updateMeta('twitter:image', iconUrl);
 
     // Save icon to cache for Service Worker to use in the manifest
-    if (iconUrl && 'caches' in window) {
+    if (iconUrl && iconUrl !== "/icon-192.png" && 'caches' in window) {
       const updateIconCache = async () => {
         try {
           const cache = await caches.open('dynamic-icons');
@@ -783,7 +813,7 @@ export default function App() {
     }
   };
 
-  const APP_URL = "https://limafinancas.netlify.app";
+  const APP_URL = "https://orin-lcl.vercel.app";
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(APP_URL);
@@ -878,6 +908,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
       if (editingExpense) {
         if (editingExpense.isFixed || editingExpense.parentId || editingExpense.isRecurring) {
           setRecurringActionType("edit");
+          setIsAddModalOpen(false);
           setIsRecurringActionModalOpen(true);
           setIsSaving(false);
           return;
@@ -1330,7 +1361,18 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
     const tithePaid = tithePaidMonths.includes(currentMonthStr);
 
     const titheToInclude = isTitheEnabled ? titheVal : 0;
-    const total = filteredExpenses.reduce((acc, curr) => acc + curr.value, 0) + titheToInclude;
+    
+    // Calculate unpaid debtors to include in "A Pagar" as requested
+    const unpaidDebtorsValue = debtors.filter(d => {
+      // For fixed debtors, check if current month is not in receivedMonths
+      if (d.isFixed) {
+        return !(d.receivedMonths || []).includes(currentMonthStr);
+      }
+      // For variable debtors, check isReceived and date
+      return !d.isReceived && d.date.slice(0, 7) === currentMonthStr;
+    }).reduce((acc, curr) => acc + curr.value, 0);
+
+    const total = filteredExpenses.reduce((acc, curr) => acc + curr.value, 0) + titheToInclude + unpaidDebtorsValue;
     const paid = filteredExpenses.filter(e => e.isPaid).reduce((acc, curr) => acc + curr.value, 0) + (isTitheEnabled && tithePaid ? titheVal : 0);
     const remaining = total - paid;
     return { 
@@ -1340,7 +1382,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
       titheValue: titheVal,
       isTithePaid: tithePaid
     };
-  }, [filteredExpenses, isTitheEnabled, totalIncome, tithePaidMonths, currentDate]);
+  }, [filteredExpenses, isTitheEnabled, totalIncome, tithePaidMonths, currentDate, debtors]);
 
   const balance = totalIncome - (totalMonthlyExpenses - (isTitheEnabled && !isTithePaid ? titheValue : 0));
 
@@ -1528,6 +1570,12 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
     }
   };
 
+  const [debtorToConfirmExtra, setDebtorToConfirmExtra] = useState<Debtor | null>(null);
+  const [isDebtorExtraConfirmModalOpen, setIsDebtorExtraConfirmModalOpen] = useState(false);
+  const [viewingDebtorInfo, setViewingDebtorInfo] = useState<Debtor | null>(null);
+  const [isDebtorInfoModalOpen, setIsDebtorInfoModalOpen] = useState(false);
+  const [isSpeedDialOpen, setIsSpeedDialOpen] = useState(false);
+
   const handleToggleDebtorReceived = async (debtor: Debtor) => {
     if (!user) return;
     const currentMonthStr = currentDate.toISOString().slice(0, 7);
@@ -1535,22 +1583,88 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
     
     try {
       const debtorRef = doc(db, path);
+      let becomingReceived = false;
+
       if (debtor.isFixed) {
         const receivedMonths = debtor.receivedMonths || [];
         const isReceived = receivedMonths.includes(currentMonthStr);
+        becomingReceived = !isReceived;
         const newReceivedMonths = isReceived 
           ? receivedMonths.filter(m => m !== currentMonthStr)
           : [...receivedMonths, currentMonthStr];
         await updateDoc(debtorRef, { receivedMonths: newReceivedMonths });
       } else {
+        becomingReceived = !debtor.isReceived;
         await updateDoc(debtorRef, { isReceived: !debtor.isReceived });
+      }
+
+      // If it became received, ask if user wants to add to extras
+      if (becomingReceived) {
+        setDebtorToConfirmExtra(debtor);
+        setIsDebtorExtraConfirmModalOpen(true);
       }
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, path);
     }
   };
 
+  const handleAddDebtorToExtras = async () => {
+    if (!user || !debtorToConfirmExtra) return;
+
+    setIsSaving(true);
+    const currentMonthStr = currentDate.toISOString().slice(0, 7);
+    const debtorValue = debtorToConfirmExtra.value;
+    
+    // Create new Additional Salary
+    const salaryData: Omit<AdditionalSalary, 'id'> = {
+      description: debtorToConfirmExtra.description,
+      value: debtorValue,
+      date: debtorToConfirmExtra.isFixed ? adjustDateToMonth(debtorToConfirmExtra.date, currentMonthStr) : debtorToConfirmExtra.date,
+      debtorId: debtorToConfirmExtra.id,
+      order: (additionalSalaries.length > 0 ? Math.max(...additionalSalaries.map(s => s.order || 0)) : -1) + 1
+    };
+
+    const salaryPath = `users/${user.uid}/additionalSalaries`;
+    const debtorPath = `users/${user.uid}/debtors/${debtorToConfirmExtra.id}`;
+
+    try {
+      const newSalaryId = crypto.randomUUID();
+      const batch = writeBatch(db);
+      
+      // Add to additional salaries
+      batch.set(doc(db, salaryPath, newSalaryId), sanitizeData(salaryData));
+      
+      // Update debtor to mark it as added to extras
+      // For fixed debtors, we might need a more complex way to track which months were added,
+      // but for now let's use a simple flag or assume it's one-off per month.
+      // If we want to be strict, we could have addedToExtrasMonths: string[]
+      if (debtorToConfirmExtra.isFixed) {
+        const docSnap = await getDoc(doc(db, debtorPath));
+        if (docSnap.exists()) {
+          const currentAddedMonths = docSnap.data().addedToExtraMonths || [];
+          batch.update(doc(db, debtorPath), { 
+            addedToExtraMonths: [...currentAddedMonths, currentMonthStr] 
+          });
+        }
+      } else {
+        batch.update(doc(db, debtorPath), { addedToExtras: true });
+      }
+
+      await batch.commit();
+      setIsDebtorExtraConfirmModalOpen(false);
+      setDebtorToConfirmExtra(null);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, salaryPath);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleEditExpense = (expense: Expense) => {
+    // Ensure recurring modal is closed before opening edit modal
+    setIsRecurringActionModalOpen(false);
+    setRecurringActionType(null);
+    
     setEditingExpense(expense);
     setFormData({
       value: expense.value,
@@ -1775,7 +1889,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
                   <Wallet className="w-16 h-16 text-white" />
                 )}
               </div>
-              <h1 className="text-4xl font-bold tracking-tight">Lima Finanças</h1>
+              <h1 className="text-4xl font-bold tracking-tight">Orin - A organização inteligente</h1>
               <p className="text-white/70 max-w-xs mx-auto">
                 Seu controle financeiro inteligente, sincronizado em todos os seus dispositivos.
               </p>
@@ -2064,21 +2178,49 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
                       transition={{ duration: 0.3, ease: "easeInOut" }}
                       className="overflow-hidden"
                     >
-                      <div className="p-6 space-y-3">
-                        {fixedExpenses.map((expense) => {
-                          return (
-                            <ExpenseItem
-                              key={`${expense.id}-${currentDate.toISOString().slice(0, 7)}`}
-                              expense={expense}
-                              currentMonthStr={currentDate.toISOString().slice(0, 7)}
-                              onTogglePaid={handleTogglePaid}
-                              onEdit={handleEditExpense}
-                              onDelete={handleDeleteExpense}
-                              formatCurrency={formatCurrency}
-                              formatDate={formatDate}
-                            />
-                          );
-                        })}
+                      <div className="p-6 space-y-6">
+                        {(() => {
+                          const grouped: { [key: string]: Expense[] } = {};
+                          fixedExpenses.forEach(e => {
+                            const dateKey = e.date.split('T')[0];
+                            if (!grouped[dateKey]) grouped[dateKey] = [];
+                            grouped[dateKey].push(e);
+                          });
+
+                          return Object.keys(grouped).sort().map(dateStr => {
+                            const date = new Date(dateStr + "T12:00:00");
+                            const dayOfWeek = date.toLocaleString('pt-BR', { weekday: 'long' });
+                            const formattedDate = formatDate(dateStr);
+                            const dailyTotal = grouped[dateStr].reduce((sum, exp) => sum + exp.value, 0);
+
+                            return (
+                              <div key={dateStr} className="space-y-3">
+                                <div className="flex items-center gap-3">
+                                  <div className="h-px flex-1 bg-white/10" />
+                                  <div className="text-[10px] uppercase font-bold text-white/40 tracking-widest flex items-center gap-2">
+                                    <CalendarIcon className="w-3 h-3" />
+                                    {formattedDate} • <span className="text-blue-300 capitalize">{dayOfWeek}</span> • <span className="text-green-400 font-bold">{formatCurrency(dailyTotal)}</span>
+                                  </div>
+                                  <div className="h-px flex-1 bg-white/10" />
+                                </div>
+                                <div className="space-y-3">
+                                  {grouped[dateStr].map(expense => (
+                                    <ExpenseItem
+                                      key={`${expense.id}-${currentDate.toISOString().slice(0, 7)}`}
+                                      expense={expense}
+                                      currentMonthStr={currentDate.toISOString().slice(0, 7)}
+                                      onTogglePaid={handleTogglePaid}
+                                      onEdit={handleEditExpense}
+                                      onDelete={handleDeleteExpense}
+                                      formatCurrency={formatCurrency}
+                                      formatDate={formatDate}
+                                    />
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          });
+                        })()}
                       </div>
                     </motion.div>
                   )}
@@ -2134,12 +2276,18 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
                           </div>
                         ) : (
                           (() => {
+                            // Group expenses by date (YYYY-MM-DD)
                             const grouped: Record<string, Expense[]> = {};
                             variableExpenses.forEach(e => {
-                              if (!grouped[e.date]) grouped[e.date] = [];
-                              grouped[e.date].push(e);
+                              const dateKey = e.date.split('T')[0];
+                              if (!grouped[dateKey]) grouped[dateKey] = [];
+                              grouped[dateKey].push(e);
                             });
 
+                            // Sort dates descending (newest first) or ascending?
+                            // Usually, daily logs are newest first or chronologically.
+                            // The filtered list is already sorted by date ascending (at line 1250).
+                            // Let's keep chronological for the month view.
                             return Object.keys(grouped).sort().map(dateStr => {
                               const date = new Date(dateStr + "T12:00:00");
                               const dayOfWeek = date.toLocaleString('pt-BR', { weekday: 'long' });
@@ -2152,7 +2300,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
                                     <div className="h-px flex-1 bg-white/10" />
                                     <div className="text-[10px] uppercase font-bold text-white/40 tracking-widest flex items-center gap-2">
                                       <CalendarIcon className="w-3 h-3" />
-                                      {formattedDate} • <span className="text-blue-300">{dayOfWeek}</span> • <span className="text-green-400">{formatCurrency(dailyTotal)}</span>
+                                      {formattedDate} • <span className="text-blue-300 capitalize">{dayOfWeek}</span> • <span className="text-green-400 font-bold">{formatCurrency(dailyTotal)}</span>
                                     </div>
                                     <div className="h-px flex-1 bg-white/10" />
                                   </div>
@@ -2641,7 +2789,23 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
                       .map(s => (
                       <div key={s.id} className="bg-white/5 p-3 rounded-2xl border border-white/10 flex justify-between items-center gap-4">
                         <div className="min-w-0 flex-1">
-                          <div className="text-sm font-bold truncate">{s.description}</div>
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <div className="text-sm font-bold truncate">{s.description}</div>
+                            {s.debtorId && (
+                              <span 
+                                className="text-[9px] text-blue-300 hover:text-blue-200 underline cursor-pointer bg-blue-500/10 px-1.5 py-0.5 rounded-full"
+                                onClick={() => {
+                                  const debtor = debtors.find(d => d.id === s.debtorId);
+                                  if (debtor) {
+                                    setViewingDebtorInfo(debtor);
+                                    setIsDebtorInfoModalOpen(true);
+                                  }
+                                }}
+                              >
+                                (lançado dos devedores)
+                              </span>
+                            )}
+                          </div>
                           <div className="text-[10px] text-white/40">{formatDate(s.date)}</div>
                         </div>
                         <div className="text-sm font-bold text-green-300 shrink-0">{formatCurrency(s.value)}</div>
@@ -2784,13 +2948,88 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
 
               <div className="w-px h-6 bg-white/20 mx-1" />
 
-              <Button 
-                onClick={() => { resetForm(); setIsAddModalOpen(true); }}
-                className="w-12 h-12 rounded-full bg-green-500 text-white shadow-lg hover:bg-green-600 transition-all"
-                title="Adicionar Despesa"
-              >
-                <Plus className="w-6 h-6" />
-              </Button>
+              <div className="relative">
+                <AnimatePresence>
+                  {isSpeedDialOpen && (
+                    <>
+                      {/* Backdrop for Speed Dial */}
+                      <motion.div 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-[#04142c]/80 backdrop-blur-sm z-[60]"
+                        onClick={() => setIsSpeedDialOpen(false)}
+                      />
+                      
+                      {/* Speed Dial Options */}
+                      <motion.div 
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 20 }}
+                        className="fixed left-1/2 bottom-28 -translate-x-1/2 flex items-end justify-center gap-6 z-[70]"
+                      >
+                        {/* Extra button */}
+                        <div className="flex flex-col items-center gap-2">
+                          <button 
+                            onClick={() => {
+                              setIsSpeedDialOpen(false);
+                              setEditingAdditionalSalary(null);
+                              setIsAdditionalSalaryModalOpen(true);
+                            }}
+                            className="w-14 h-14 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center text-blue-400 hover:scale-110 active:scale-95 transition-all shadow-xl"
+                          >
+                            <Banknote className="w-6 h-6" />
+                          </button>
+                          <span className="text-[10px] font-bold text-white uppercase tracking-widest">Extra</span>
+                        </div>
+
+                        {/* Despesa (Main Action in Center) */}
+                        <div className="flex flex-col items-center gap-2 -translate-y-4">
+                          <button 
+                            onClick={() => {
+                              setIsSpeedDialOpen(false);
+                              resetForm();
+                              setIsAddModalOpen(true);
+                            }}
+                            className="w-20 h-20 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center text-rose-400 hover:scale-110 active:scale-95 transition-all shadow-xl"
+                          >
+                            <Plus className="w-10 h-10" />
+                          </button>
+                          <span className="text-xs font-bold text-white uppercase tracking-widest">Despesa</span>
+                        </div>
+
+                        {/* Devedor button */}
+                        <div className="flex flex-col items-center gap-2">
+                          <button 
+                            onClick={() => {
+                              setIsSpeedDialOpen(false);
+                              setEditingDebtor(null);
+                              setIsDebtorModalOpen(true);
+                            }}
+                            className="w-14 h-14 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center text-purple-400 hover:scale-110 active:scale-95 transition-all shadow-xl"
+                          >
+                            <UserPlus className="w-6 h-6" />
+                          </button>
+                          <span className="text-[10px] font-bold text-white uppercase tracking-widest">Devedor</span>
+                        </div>
+                      </motion.div>
+                    </>
+                  )}
+                </AnimatePresence>
+
+                <Button 
+                  onClick={() => setIsSpeedDialOpen(!isSpeedDialOpen)}
+                  className={cn(
+                    "w-12 h-12 rounded-full transition-all z-[80] relative",
+                    isSpeedDialOpen 
+                      ? "bg-rose-500 text-white rotate-45" 
+                      : "bg-green-500 text-white shadow-lg hover:bg-green-600"
+                  )}
+                  title="Menu de adição"
+                >
+                  <Plus className="w-6 h-6" />
+                </Button>
+              </div>
             </div>
           </div>
         )}
@@ -3183,46 +3422,49 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
 
       {/* Add/Edit Additional Salary Modal */}
       <Dialog open={isAdditionalSalaryModalOpen} onOpenChange={setIsAdditionalSalaryModalOpen}>
-        <DialogContent className="bg-white/10 backdrop-blur-2xl border-white/10 text-white w-[95vw] sm:max-w-[425px] rounded-3xl">
-          <DialogHeader>
+        <DialogContent className="bg-white/10 backdrop-blur-3xl border-white/10 text-white w-[95vw] sm:max-w-[425px] rounded-[2rem] p-0 overflow-hidden max-h-[90vh] flex flex-col">
+          <DialogHeader className="p-6 pb-2">
             <DialogTitle className="text-2xl font-bold">
-              {editingAdditionalSalary ? "Editar Salário Adicional" : "Novo Salário Adicional"}
+              {editingAdditionalSalary ? "Editar Renda Extra" : "Nova Renda Extra"}
             </DialogTitle>
           </DialogHeader>
-          <div className="grid gap-6 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="add-salary-date" className="text-white/70">Data</Label>
-              <div className="relative">
-                <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/50" />
+          <div className="flex-1 overflow-y-auto px-6 py-4">
+            <div className="grid gap-6">
+              <div className="grid gap-2">
+                <Label htmlFor="add-salary-date" className="text-white/70">Data</Label>
+                <div className="relative">
+                  <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/50" />
+                  <Input
+                    id="add-salary-date"
+                    type="date"
+                    value={additionalSalaryFormData.date}
+                    onChange={(e) => setAdditionalSalaryFormData({ ...additionalSalaryFormData, date: e.target.value })}
+                    className="bg-white/10 border-white/20 text-white pl-10 h-12 rounded-xl"
+                  />
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="add-salary-value" className="text-white/70">Valor (R$)</Label>
                 <Input
-                  id="add-salary-date"
-                  type="date"
-                  value={additionalSalaryFormData.date}
-                  onChange={(e) => setAdditionalSalaryFormData({ ...additionalSalaryFormData, date: e.target.value })}
-                  className="bg-white/10 border-white/20 text-white pl-10"
+                  id="add-salary-value"
+                  type="number"
+                  inputMode="decimal"
+                  value={additionalSalaryFormData.value || ""}
+                  onChange={(e) => setAdditionalSalaryFormData({ ...additionalSalaryFormData, value: parseFloat(e.target.value) || 0 })}
+                  className="bg-white/10 border-white/20 text-white placeholder:text-white/30 h-12 rounded-xl"
+                  placeholder="0,00"
                 />
               </div>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="add-salary-value" className="text-white/70">Valor (R$)</Label>
-              <Input
-                id="add-salary-value"
-                type="number"
-                value={additionalSalaryFormData.value || ""}
-                onChange={(e) => setAdditionalSalaryFormData({ ...additionalSalaryFormData, value: parseFloat(e.target.value) || 0 })}
-                className="bg-white/10 border-white/20 text-white placeholder:text-white/30"
-                placeholder="0,00"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="add-salary-description" className="text-white/70">Descrição</Label>
-              <Input
-                id="add-salary-description"
-                value={additionalSalaryFormData.description}
-                onChange={(e) => setAdditionalSalaryFormData({ ...additionalSalaryFormData, description: e.target.value })}
-                className="bg-white/10 border-white/20 text-white placeholder:text-white/30"
-                placeholder="Ex: Freelance, Venda..."
-              />
+              <div className="grid gap-2">
+                <Label htmlFor="add-salary-description" className="text-white/70">Descrição</Label>
+                <Input
+                  id="add-salary-description"
+                  value={additionalSalaryFormData.description}
+                  onChange={(e) => setAdditionalSalaryFormData({ ...additionalSalaryFormData, description: e.target.value })}
+                  className="bg-white/10 border-white/20 text-white placeholder:text-white/30 h-12 rounded-xl"
+                  placeholder="Ex: Freelance, Venda..."
+                />
+              </div>
             </div>
           </div>
           {validationError && (
@@ -3233,7 +3475,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
               </div>
             </div>
           )}
-          <DialogFooter className="flex flex-col gap-2 sm:flex-row">
+          <DialogFooter className="p-6 pt-2 flex flex-col gap-3 sm:flex-row">
             {editingAdditionalSalary && (
               <Button 
                 variant="destructive"
@@ -3241,7 +3483,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
                   handleDeleteAdditionalSalary(editingAdditionalSalary.id);
                   setIsAdditionalSalaryModalOpen(false);
                 }}
-                className="bg-red-500/20 hover:bg-red-500/40 text-red-200 border border-red-500/50"
+                className="w-full sm:w-auto bg-red-500/20 hover:bg-red-500/40 text-red-200 border border-red-500/50 h-12 rounded-xl order-2 sm:order-1"
               >
                 Excluir
               </Button>
@@ -3249,7 +3491,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
             <Button 
               onClick={handleAddAdditionalSalary}
               disabled={isSaving}
-              className="flex-1 bg-white text-[#04142c] hover:bg-white/90 font-bold"
+              className="flex-1 bg-white text-[#04142c] hover:bg-white/90 font-bold h-12 rounded-xl order-1 sm:order-2"
             >
               {isSaving ? "Salvando..." : "Salvar"}
             </Button>
@@ -3343,22 +3585,22 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
 
       {/* Additional Salary List Modal */}
       <Dialog open={isAdditionalSalaryListModalOpen} onOpenChange={setIsAdditionalSalaryListModalOpen}>
-        <DialogContent className="bg-white/10 backdrop-blur-2xl border-white/10 text-white w-[95vw] sm:max-w-[450px] rounded-3xl">
-          <DialogHeader>
+        <DialogContent className="bg-white/10 backdrop-blur-3xl border-white/10 text-white w-[95vw] sm:max-w-[450px] rounded-[2rem] p-0 overflow-hidden max-h-[90vh] flex flex-col">
+          <DialogHeader className="p-6 pb-2">
             <DialogTitle className="text-xl font-bold flex items-center gap-2">
-              <ArrowUpCircle className="w-5 h-5 text-green-400" />
-              Salários Adicionais - {monthName}
+              <ArrowUpCircle className="w-6 h-6 text-green-400" />
+              Rendas Extras - {monthName}
             </DialogTitle>
           </DialogHeader>
-          <div className="py-4">
-            <div className="bg-white/5 p-4 rounded-2xl border border-white/10 mb-4 flex justify-between items-center gap-4 overflow-hidden">
-              <span className="text-sm text-white/70 uppercase font-bold tracking-wider shrink-0">Total do Mês</span>
-              <span className="text-2xl font-bold text-green-400 truncate">{formatCurrency(totalAdditionalSalary)}</span>
+          <div className="flex-1 overflow-y-auto px-6 py-4">
+            <div className="bg-white/5 p-5 rounded-2xl border border-white/10 mb-6 flex justify-between items-center gap-4">
+              <span className="text-xs text-white/50 uppercase font-black tracking-widest shrink-0">Total Mensal</span>
+              <span className="text-2xl font-bold text-green-400 truncate strike-green-glow">{formatCurrency(totalAdditionalSalary)}</span>
             </div>
             
-            <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+            <div className="space-y-4 custom-scrollbar">
               {displayAdditionalSalaries.length > 0 ? (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <AnimatePresence mode="popLayout">
                     {displayAdditionalSalaries.map(s => (
                       <AdditionalSalaryItem
@@ -3368,28 +3610,35 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
                         onDelete={handleDeleteAdditionalSalary}
                         formatCurrency={formatCurrency}
                         formatDate={formatDate}
+                        onViewDebtorInfo={(id) => {
+                          const debtor = debtors.find(d => d.id === id);
+                          if (debtor) {
+                            setViewingDebtorInfo(debtor);
+                            setIsDebtorInfoModalOpen(true);
+                          }
+                        }}
                       />
                     ))}
                   </AnimatePresence>
                 </div>
               ) : (
-                <div className="text-center py-8 text-white/30 italic">
-                  Nenhum salário adicional registrado para este mês.
+                <div className="text-center py-12 text-white/30 italic">
+                  Nenhuma renda extra registrada.
                 </div>
               )}
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="p-6 pt-2">
             <Button 
-              className="w-full bg-white/10 hover:bg-white/20 text-white border border-white/10"
+              className="w-full bg-white text-[#04142c] hover:bg-white/90 font-bold h-12 rounded-xl border-none"
               onClick={() => {
                 setIsAdditionalSalaryListModalOpen(false);
                 resetAdditionalSalaryForm();
                 setIsAdditionalSalaryModalOpen(true);
               }}
             >
-              <Plus className="w-4 h-4 mr-2" />
-              Adicionar Novo
+              <Plus className="w-5 h-5 mr-2" />
+              Adicionar Nova Renda
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -3552,6 +3801,104 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
         </DialogContent>
       </Dialog>
 
+      {/* Debtor to Extra Confirmation Modal */}
+      <Dialog open={isDebtorExtraConfirmModalOpen} onOpenChange={setIsDebtorExtraConfirmModalOpen}>
+        <DialogContent className="bg-white/10 backdrop-blur-3xl border-white/10 text-white rounded-[2rem] w-[95vw] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+              <Plus className="w-5 h-5 text-green-400" />
+              Lançar Rendimento Extra?
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-6 space-y-4">
+            <p className="text-sm text-white/70 leading-relaxed">
+              O devedor <span className="text-white font-bold">{debtorToConfirmExtra?.description}</span> foi recebido com sucesso.
+            </p>
+            <p className="text-sm text-white/70 leading-relaxed">
+              Deseja lançar o valor de <span className="text-green-400 font-bold">{formatCurrency(debtorToConfirmExtra?.value || 0)}</span> como rendimento extra neste mês?
+            </p>
+          </div>
+          <DialogFooter className="flex gap-2 sm:gap-0">
+            <Button 
+              variant="ghost" 
+              onClick={() => {
+                setIsDebtorExtraConfirmModalOpen(false);
+                setDebtorToConfirmExtra(null);
+              }}
+              className="flex-1 text-white/50 hover:text-white hover:bg-white/10 h-12 rounded-xl"
+            >
+              Agora não
+            </Button>
+            <Button 
+              onClick={handleAddDebtorToExtras}
+              className="flex-1 bg-white text-[#04142c] hover:bg-white/90 font-bold h-12 rounded-xl"
+              disabled={isSaving}
+            >
+              {isSaving ? "Lançando..." : "Sim, Lançar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Debtor Info Modal */}
+      <Dialog open={isDebtorInfoModalOpen} onOpenChange={setIsDebtorInfoModalOpen}>
+        <DialogContent className="bg-white/10 backdrop-blur-3xl border-white/10 text-white rounded-[2rem] w-[95vw] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+              <UserIcon className="w-5 h-5 text-blue-400" />
+              Informações do Devedor
+            </DialogTitle>
+          </DialogHeader>
+          {viewingDebtorInfo && (
+            <div className="py-6 space-y-6">
+              <div className="bg-white/5 p-4 rounded-2xl border border-white/10 space-y-4">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h4 className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-1">Nome / Descrição</h4>
+                    <p className="text-lg font-bold">{viewingDebtorInfo.description}</p>
+                  </div>
+                  <div className="text-right">
+                    <h4 className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-1">Valor</h4>
+                    <p className="text-xl font-bold text-green-300">{formatCurrency(viewingDebtorInfo.value)}</p>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <h4 className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-1">Data</h4>
+                    <p className="text-sm font-medium">{formatDate(viewingDebtorInfo.date)}</p>
+                  </div>
+                  <div>
+                    <h4 className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-1">Tipo</h4>
+                    <p className="text-sm font-medium">{viewingDebtorInfo.isFixed ? "Fixo" : "Variável"}</p>
+                  </div>
+                </div>
+
+                {viewingDebtorInfo.notes && (
+                  <div>
+                    <h4 className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-1">Observações</h4>
+                    <p className="text-sm text-white/70 italic bg-white/5 p-3 rounded-xl border border-white/10">
+                      "{viewingDebtorInfo.notes}"
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button 
+              className="w-full bg-white/10 text-white hover:bg-white/20 font-bold h-12 rounded-xl border-white/10"
+              onClick={() => {
+                setIsDebtorInfoModalOpen(false);
+                setViewingDebtorInfo(null);
+              }}
+            >
+              Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Share Modal */}
       <Dialog open={isShareModalOpen} onOpenChange={setIsShareModalOpen}>
         <DialogContent className="bg-white/10 backdrop-blur-2xl border-white/10 text-white rounded-3xl w-[95vw] sm:max-w-md p-0">
@@ -3565,11 +3912,11 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
             <div className="space-y-6">
               <div className="bg-white/5 p-4 rounded-2xl border border-white/10 space-y-4">
                 <p className="text-sm text-white/70 leading-relaxed">
-                  Compartilhe o link abaixo para que outras pessoas possam gerenciar suas finanças de forma independente com login Google.
+                  Compartilhe o link abaixo para que outras pessoas possam utilizar o Orin de forma independente com login Google.
                 </p>
                 <div className="flex flex-col gap-2 bg-white/5 p-3 rounded-xl border border-white/10">
                   <code className="text-xs font-mono text-blue-300 break-all py-1">
-                    https://limafinancas.netlify.app
+                    https://orin-lcl.vercel.app
                   </code>
                   <Button 
                     size="sm" 
