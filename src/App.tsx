@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Plus, Trash2, Edit2, Wallet, ArrowUpCircle, ArrowDownCircle, ChevronLeft, ChevronRight, ChevronDown, Calendar as CalendarIcon, BarChart3, Home, PieChart, TrendingUp, LogOut, LogIn, AlertCircle, GripVertical, Share2, Copy, Check, Download, Camera, Target, User as UserIcon, UserPlus, Banknote, X, Settings, Minus, ShieldAlert, RefreshCw } from "lucide-react";
+import { Plus, Trash2, Edit2, Wallet, ArrowUpCircle, ArrowDownCircle, ChevronLeft, ChevronRight, ChevronDown, Calendar as CalendarIcon, BarChart3, Home, PieChart, TrendingUp, LogOut, LogIn, AlertCircle, GripVertical, Share2, Copy, Check, Download, Camera, Target, User as UserIcon, UserPlus, Banknote, X, Settings, Minus, ShieldAlert, RefreshCw, CheckCheck, CheckCircle, ShieldCheck, XCircle } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   BarChart, 
@@ -32,7 +32,7 @@ import {
   getDocFromServer
 } from "firebase/firestore";
 import { auth, db, signInWithGoogle, logout, handleFirestoreError, OperationType, sanitizeData } from "./firebase";
-import { formatCurrencyParts, generateId, addMonths, addYears, formatDateToISO } from "./utils";
+import { formatCurrencyParts, generateId, addMonths, addYears, formatDateToISO, formatCurrencyInput, parseCurrencyInput } from "./utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -125,6 +125,22 @@ const DEFAULT_CATEGORIES = [
   "Saúde",
   "Supermercado",
 ];
+
+interface Tribute {
+  id: string;
+  name: string;
+  percentage: number;
+  base: 'total' | 'main';
+  enabled: boolean;
+}
+
+interface AppUser {
+  id: string;
+  name: string;
+  email: string;
+  status: 'pending' | 'active' | 'rejected';
+  createdAt: string;
+}
 
 // Main App Component
 interface DebtorItemProps {
@@ -422,6 +438,11 @@ const AdditionalSalaryItem: React.FC<AdditionalSalaryItemProps> = ({
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
+  const [appUserStatus, setAppUserStatus] = useState<AppUser['status']>('pending');
+  const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
+  const [allAppUsers, setAllAppUsers] = useState<AppUser[]>([]);
+  const isAdmin = user?.email === "loukianoslimes@gmail.com";
+
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [isSyncing, setIsSyncing] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -438,8 +459,25 @@ export default function App() {
   const [tempSalary, setTempSalary] = useState<number>(0);
   const [tempSecondarySalary, setTempSecondarySalary] = useState<number>(0);
   const [isSalaryApplyModalOpen, setIsSalaryApplyModalOpen] = useState(false);
-  const [isTitheEnabled, setIsTitheEnabled] = useState(false);
-  const [tithePaidMonths, setTithePaidMonths] = useState<string[]>([]);
+  const [isTributeModalOpen, setIsTributeModalOpen] = useState(false);
+  const [editingTribute, setEditingTribute] = useState<Tribute | null>(null);
+  const [tributes, setTributes] = useState<Tribute[]>([
+    { id: "t_dizimo", name: "Dízimo", percentage: 10, base: "total", enabled: false },
+    { id: "t_passagem", name: "Passagem", percentage: 6, base: "main", enabled: false },
+    { id: "t_inss", name: "INSS", percentage: 8, base: "main", enabled: false }
+  ]);
+  const [tributeFormData, setTributeFormData] = useState<Tribute>({
+    id: '', name: '', percentage: 0, base: 'total', enabled: true
+  });
+
+  useEffect(() => {
+    if (editingTribute) {
+      setTributeFormData(editingTribute);
+    } else {
+      setTributeFormData({ id: '', name: '', percentage: 0, base: 'total', enabled: true });
+    }
+  }, [editingTribute, isTributeModalOpen]);
+
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [debtors, setDebtors] = useState<Debtor[]>([]);
   const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
@@ -497,8 +535,6 @@ export default function App() {
   const APP_VERSION = "1.0.5"; // Increment this to track updates
 
   const [systemConfig, setSystemConfig] = useState<{ appIconUrl?: string }>({});
-  const isAdmin = user?.email === "loukianoslimes@gmail.com";
-
   // Fetch System Config
   useEffect(() => {
     const configPath = "system/config";
@@ -639,8 +675,11 @@ export default function App() {
       setAdditionalSalaries([]);
       setSalary(0);
       setSecondarySalary(0);
-      setIsTitheEnabled(false);
-      setTithePaidMonths([]);
+      setTributes([
+        { id: "t_dizimo", name: "Dízimo", percentage: 10, base: "total", enabled: false },
+        { id: "t_passagem", name: "Passagem", percentage: 6, base: "main", enabled: false },
+        { id: "t_inss", name: "INSS", percentage: 8, base: "main", enabled: false }
+      ]);
       return;
     }
 
@@ -656,6 +695,44 @@ export default function App() {
     };
     testConnection();
 
+    // App User Status Sync
+    const userStatusPath = `app_users/${user.uid}`;
+    const userStatusUnsubscribe = onSnapshot(doc(db, userStatusPath), async (docSnap) => {
+      if (docSnap.exists()) {
+        setAppUserStatus(docSnap.data().status as AppUser['status']);
+      } else {
+        // Create pending user if not exists
+        try {
+          await setDoc(doc(db, userStatusPath), {
+            id: user.uid,
+            name: user.displayName || 'Unknown User',
+            email: user.email || 'No Email',
+            status: 'pending',
+            createdAt: new Date().toISOString()
+          });
+          setAppUserStatus('pending');
+        } catch (error) {
+          handleFirestoreError(error, OperationType.CREATE, userStatusPath);
+        }
+      }
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, userStatusPath);
+    });
+
+    // Admin Users List Sync
+    let allUsersUnsubscribe = () => {};
+    if (isAdmin) {
+      allUsersUnsubscribe = onSnapshot(collection(db, 'app_users'), (querySnapshot) => {
+        const users: AppUser[] = [];
+        querySnapshot.forEach((doc) => {
+          users.push(doc.data() as AppUser);
+        });
+        setAllAppUsers(users);
+      }, (error) => {
+        handleFirestoreError(error, OperationType.GET, 'app_users');
+      });
+    }
+
     // Listen to Settings (Salary & Dashboard Order)
     const settingsPath = `users/${user.uid}/settings/main`;
     const settingsUnsubscribe = onSnapshot(doc(db, settingsPath), (docSnap) => {
@@ -664,8 +741,16 @@ export default function App() {
         const cloudSalary = data.salary || 0;
         const cloudSecondarySalary = data.secondarySalary || 0;
         const cloudMonthlySalaries = data.monthlySalaries || {};
-        const cloudIsTitheEnabled = data.isTitheEnabled || false;
-        const cloudTithePaidMonths = data.tithePaidMonths || [];
+        
+        let cloudTributes = data.tributes;
+        if (!cloudTributes) {
+          // Migration from old tithe fields
+          cloudTributes = [
+            { id: "t_dizimo", name: "Dízimo", percentage: 10, base: "total", enabled: data.isTitheEnabled || false },
+            { id: "t_passagem", name: "Passagem", percentage: 6, base: "main", enabled: false },
+            { id: "t_inss", name: "INSS", percentage: 8, base: "main", enabled: false }
+          ];
+        }
         
         if (data.photoURL) {
           setUserPhotoUrl(data.photoURL);
@@ -673,8 +758,7 @@ export default function App() {
           setUserPhotoUrl(user.photoURL);
         }
 
-        setIsTitheEnabled(cloudIsTitheEnabled);
-        setTithePaidMonths(cloudTithePaidMonths);
+        setTributes(cloudTributes);
         setMonthlySalaries(cloudMonthlySalaries);
         setBaseSalary(cloudSalary);
         setBaseSecondarySalary(cloudSecondarySalary);
@@ -738,6 +822,8 @@ export default function App() {
     }, (error) => handleFirestoreError(error, OperationType.GET, debtorsPath));
 
     return () => {
+      userStatusUnsubscribe();
+      allUsersUnsubscribe();
       settingsUnsubscribe();
       expensesUnsubscribe();
       additionalUnsubscribe();
@@ -868,25 +954,79 @@ export default function App() {
     }
   };
 
-  const handleToggleTithe = async () => {
+  const handleToggleTribute = async (id: string, enabled: boolean) => {
     if (!user) return;
     const path = `users/${user.uid}/settings/main`;
     try {
-      await setDoc(doc(db, path), { isTitheEnabled: !isTitheEnabled }, { merge: true });
+      const newTributes = tributes.map(t => 
+        t.id === id ? { ...t, enabled } : t
+      );
+      await setDoc(doc(db, path), { tributes: newTributes }, { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, path);
     }
   };
 
-  const handleToggleTithePaid = async () => {
+  const handleUpdateTribute = async (updatedTribute: Tribute) => {
     if (!user) return;
-    const currentMonthStr = currentDate.toISOString().slice(0, 7);
     const path = `users/${user.uid}/settings/main`;
     try {
-      const newPaidMonths = isTithePaid
-        ? tithePaidMonths.filter(m => m !== currentMonthStr)
-        : [...tithePaidMonths, currentMonthStr];
-      await setDoc(doc(db, path), { tithePaidMonths: newPaidMonths }, { merge: true });
+      const newTributes = tributes.map(t => 
+        t.id === updatedTribute.id ? updatedTribute : t
+      );
+      await setDoc(doc(db, path), { tributes: newTributes }, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, path);
+    }
+  };
+
+  const handleAddTribute = async (newTribute: Tribute) => {
+    if (!user) return;
+    const path = `users/${user.uid}/settings/main`;
+    try {
+      const newTributes = [...tributes, newTribute];
+      await setDoc(doc(db, path), { tributes: newTributes }, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, path);
+    }
+  };
+
+  const handleUpdateAppUserStatus = async (targetUserId: string, newStatus: AppUser['status']) => {
+    if (!isAdmin && newStatus !== 'pending') return; // Only admin can explicitly set status (except user resetting to pending)
+    const targetPath = `app_users/${targetUserId}`;
+    try {
+      await updateDoc(doc(db, targetPath), { status: newStatus });
+      if (targetUserId === user?.uid) {
+        setAppUserStatus(newStatus);
+      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, targetPath);
+    }
+  };
+
+  const handleSaveTribute = async () => {
+    if (!tributeFormData.name) {
+      setValidationError("O nome do tributo é obrigatório.");
+      return;
+    }
+    setValidationError(null);
+    if (editingTribute) {
+      await handleUpdateTribute(tributeFormData);
+    } else {
+      await handleAddTribute({
+        ...tributeFormData,
+        id: "t_" + Math.random().toString(36).substr(2, 9)
+      });
+    }
+    setIsTributeModalOpen(false);
+  };
+
+  const handleDeleteTribute = async (id: string) => {
+    if (!user) return;
+    const path = `users/${user.uid}/settings/main`;
+    try {
+      const newTributes = tributes.filter(t => t.id !== id);
+      await setDoc(doc(db, path), { tributes: newTributes }, { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, path);
     }
@@ -1007,6 +1147,9 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
         });
 
         const path = `${basePath}/${editingExpense.id}`;
+        
+        // If it's a bulk edit, the bulkActionTarget logic will handle it differently, 
+        // but for single edit we still use the value as is.
         await setDoc(doc(db, path), sanitizeData({
           ...formData,
           uid: user.uid,
@@ -1032,6 +1175,12 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
 
           const batch = writeBatch(db);
           const newItems = [];
+          
+          // Calculate unit value based on calculationType
+          const unitValue = formData.calculationType === 'total' 
+            ? formData.value / formData.repeatCount 
+            : formData.value;
+
           for (let i = 0; i < formData.repeatCount; i++) {
             let nextDate: Date;
             let nextDueDateStr = "";
@@ -1052,6 +1201,7 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
             const path = `${basePath}/${id}`;
             const itemData = {
               ...formData,
+              value: unitValue, // Use correctly calculated unit value
               uid: user.uid,
               date: formatDateToISO(nextDate),
               dueDate: nextDueDateStr || formData.dueDate,
@@ -1253,6 +1403,20 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
       setIsSaving(false);
     }
   };
+  const getInstallmentMessage = (data: { value: number, date: string, repeatCount: number, calculationType: "total" | "monthly" }) => {
+    if (!data.repeatCount || data.repeatCount <= 1) return null;
+    
+    const [y, m, d] = data.date.split('-').map(Number);
+    const endDate = new Date(y, m - 1 + (data.repeatCount - 1), d);
+    const monthName = endDate.toLocaleString('pt-BR', { month: 'long' });
+    
+    const monthlyValue = data.calculationType === "total" 
+      ? data.value / data.repeatCount 
+      : data.value;
+      
+    return `Essa parcela termina em ${monthName} com valor de ${formatCurrency(monthlyValue)} por mês.`;
+  };
+
   const handleTogglePaid = async (expense: Expense) => {
     if (!user) return;
     const currentMonthStr = currentDate.toISOString().slice(0, 7);
@@ -1272,6 +1436,74 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
       }
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, path);
+    }
+  };
+
+  const handleMarkAllFixedPaid = async () => {
+    if (!user || fixedExpenses.length === 0) return;
+    const currentMonthStr = currentDate.toISOString().slice(0, 7);
+    const batch = writeBatch(db);
+    let count = 0;
+    
+    fixedExpenses.forEach(expense => {
+      const paidMonths = expense.paidMonths || [];
+      if (!paidMonths.includes(currentMonthStr)) {
+        const expenseRef = doc(db, `users/${user.uid}/expenses/${expense.id}`);
+        batch.update(expenseRef, { paidMonths: [...paidMonths, currentMonthStr] });
+        count++;
+      }
+    });
+    
+    if (count > 0) {
+      try {
+        await batch.commit();
+      } catch (error) {
+        handleFirestoreError(error, OperationType.UPDATE, "batch-fixed-paid");
+      }
+    }
+  };
+
+  const handleMarkAllVariablePaid = async () => {
+    if (!user || variableExpenses.length === 0) return;
+    const batch = writeBatch(db);
+    let count = 0;
+    
+    variableExpenses.forEach(expense => {
+      if (!expense.isPaid) {
+        const expenseRef = doc(db, `users/${user.uid}/expenses/${expense.id}`);
+        batch.update(expenseRef, { isPaid: true });
+        count++;
+      }
+    });
+    
+    if (count > 0) {
+      try {
+        await batch.commit();
+      } catch (error) {
+        handleFirestoreError(error, OperationType.UPDATE, "batch-variable-paid");
+      }
+    }
+  };
+
+  const handleMarkWeekPaid = async (expensesInWeek: Expense[]) => {
+    if (!user || expensesInWeek.length === 0) return;
+    const batch = writeBatch(db);
+    let count = 0;
+    
+    expensesInWeek.forEach(expense => {
+      if (!expense.isPaid) {
+        const expenseRef = doc(db, `users/${user.uid}/expenses/${expense.id}`);
+        batch.update(expenseRef, { isPaid: true });
+        count++;
+      }
+    });
+    
+    if (count > 0) {
+      try {
+        await batch.commit();
+      } catch (error) {
+        handleFirestoreError(error, OperationType.UPDATE, "batch-week-paid");
+      }
     }
   };
 
@@ -1398,6 +1630,7 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
     notes: string;
     date: string;
     dueDate: string;
+    calculationType: "total" | "monthly";
   }>(() => {
     const now = new Date();
     const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -1412,6 +1645,7 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
       notes: "",
       date: today,
       dueDate: "",
+      calculationType: "monthly",
     };
   });
 
@@ -1425,6 +1659,7 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
     notes: string;
     date: string;
     category: string;
+    calculationType: "total" | "monthly";
   }>(() => {
     const now = new Date();
     const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -1438,6 +1673,7 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
       notes: "",
       date: today,
       category: DEFAULT_CATEGORIES[0],
+      calculationType: "monthly",
     };
   });
 
@@ -1565,14 +1801,30 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
     return filteredAdditionalSalaries.reduce((acc, curr) => acc + curr.value, 0);
   }, [filteredAdditionalSalaries]);
 
-  const totalIncome = salary + secondarySalary + totalAdditionalSalary;
+  const { grossIncome, totalIncome, totalTributesDiscount } = useMemo(() => {
+    const grossTotal = salary + secondarySalary + totalAdditionalSalary;
+    
+    let totalDiscount = 0;
+    
+    tributes.forEach(t => {
+      if (t.enabled) {
+        if (t.base === 'main') {
+          totalDiscount += salary * (t.percentage / 100);
+        } else {
+          totalDiscount += grossTotal * (t.percentage / 100);
+        }
+      }
+    });
 
-  const { totalMonthlyExpenses, totalPaidExpenses, totalRemainingExpenses, titheValue, isTithePaid } = useMemo(() => {
+    return {
+      grossIncome: grossTotal,
+      totalIncome: grossTotal - totalDiscount,
+      totalTributesDiscount: totalDiscount
+    };
+  }, [salary, secondarySalary, totalAdditionalSalary, tributes]);
+
+  const { totalMonthlyExpenses, totalPaidExpenses, totalRemainingExpenses } = useMemo(() => {
     const currentMonthStr = currentDate.toISOString().slice(0, 7);
-    const titheVal = totalIncome * 0.1;
-    const tithePaid = tithePaidMonths.includes(currentMonthStr);
-
-    const titheToInclude = isTitheEnabled ? titheVal : 0;
     
     // Calculate unpaid debtors to include in "A Pagar" as requested
     const unpaidDebtorsValue = debtors.filter(d => {
@@ -1584,19 +1836,17 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
       return !d.isReceived && d.date.slice(0, 7) === currentMonthStr;
     }).reduce((acc, curr) => acc + curr.value, 0);
 
-    const total = filteredExpenses.reduce((acc, curr) => acc + curr.value, 0) + titheToInclude + unpaidDebtorsValue;
-    const paid = filteredExpenses.filter(e => e.isPaid).reduce((acc, curr) => acc + curr.value, 0) + (isTitheEnabled && tithePaid ? titheVal : 0);
+    const total = filteredExpenses.reduce((acc, curr) => acc + curr.value, 0) + unpaidDebtorsValue;
+    const paid = filteredExpenses.filter(e => e.isPaid).reduce((acc, curr) => acc + curr.value, 0);
     const remaining = total - paid;
     return { 
       totalMonthlyExpenses: total, 
       totalPaidExpenses: paid, 
-      totalRemainingExpenses: remaining,
-      titheValue: titheVal,
-      isTithePaid: tithePaid
+      totalRemainingExpenses: remaining
     };
-  }, [filteredExpenses, isTitheEnabled, totalIncome, tithePaidMonths, currentDate, debtors]);
+  }, [filteredExpenses, currentDate, debtors]);
 
-  const balance = totalIncome - (totalMonthlyExpenses - (isTitheEnabled && !isTithePaid ? titheValue : 0));
+  const balance = totalIncome - totalMonthlyExpenses;
 
   // Logic for dynamic balance messages
   const balanceMessage = useMemo(() => {
@@ -1627,13 +1877,21 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
       }
     });
 
-    const prevTotalIncome = salary + secondarySalary + prevAdditionalSalary;
+    const prevGrossTotalIncome = salary + secondarySalary + prevAdditionalSalary;
     
-    // Include tithe in previous month expenses if enabled
-    const prevTitheValue = isTitheEnabled ? prevTotalIncome * 0.1 : 0;
-    const prevTotalExpensesWithTithe = prevTotalExpenses + prevTitheValue;
-    
-    const prevBalance = prevTotalIncome - prevTotalExpensesWithTithe;
+    let totalDiscount = 0;
+    tributes.forEach(t => {
+      if (t.enabled) {
+        if (t.base === 'main') {
+          totalDiscount += salary * (t.percentage / 100);
+        } else {
+          totalDiscount += prevGrossTotalIncome * (t.percentage / 100);
+        }
+      }
+    });
+
+    const prevTotalIncome = prevGrossTotalIncome - totalDiscount;
+    const prevBalance = prevTotalIncome - prevTotalExpenses;
 
     // 2. Apply rules in priority order
     
@@ -1693,6 +1951,7 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
       notes: "",
       date: today,
       category: DEFAULT_CATEGORIES[0],
+      calculationType: "monthly",
     });
     setEditingDebtor(null);
     setValidationError(null);
@@ -1757,6 +2016,11 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
           const [y, m, d] = debtorFormData.date.split('-').map(Number);
           const baseDate = new Date(y, m - 1, d);
 
+          // Calculate unit value based on calculationType
+          const unitValue = debtorFormData.calculationType === 'total' 
+            ? debtorFormData.value / debtorFormData.repeatCount 
+            : debtorFormData.value;
+
           const batch = writeBatch(db);
           for (let i = 0; i < debtorFormData.repeatCount; i++) {
             let nextDate: Date;
@@ -1770,6 +2034,7 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
             const path = `${basePath}/${id}`;
             batch.set(doc(db, path), sanitizeData({
               ...debtorData,
+              value: unitValue, // Use unit value
               date: formatDateToISO(nextDate),
               parentId: parentId,
               installmentIndex: i + 1,
@@ -1802,7 +2067,8 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
       repeatFrequency: debtor.repeatFrequency || "monthly",
       notes: debtor.notes || "",
       date: toISODate(debtor.date),
-      category: debtor.category || "",
+      category: debtor.category || (categories[0] || DEFAULT_CATEGORIES[0]),
+      calculationType: "monthly",
     });
     setIsDebtorModalOpen(true);
   };
@@ -1849,6 +2115,68 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
   const [isUndoVisible, setIsUndoVisible] = useState(false);
   const [isBulkConfirmOpen, setIsBulkConfirmOpen] = useState(false);
   const [bulkActionTarget, setBulkActionTarget] = useState<{ type: 'edit' | 'delete', expense?: Expense, debtor?: Debtor } | null>(null);
+
+  // Mobile Back Button Support
+  useEffect(() => {
+    const handlePopState = () => {
+      let closedAny = false;
+      if (isAddModalOpen) { setIsAddModalOpen(false); closedAny = true; }
+      if (isDebtorModalOpen) { setIsDebtorModalOpen(false); closedAny = true; }
+      if (isSalaryModalOpen) { setIsSalaryModalOpen(false); closedAny = true; }
+      if (isAdditionalSalaryModalOpen) { setIsAdditionalSalaryModalOpen(false); closedAny = true; }
+      if (isAdditionalSalaryListModalOpen) { setIsAdditionalSalaryListModalOpen(false); closedAny = true; }
+      if (isSalaryApplyModalOpen) { setIsSalaryApplyModalOpen(false); closedAny = true; }
+      if (isTributeModalOpen) { setIsTributeModalOpen(false); closedAny = true; }
+      if (isAdminPanelOpen) { setIsAdminPanelOpen(false); closedAny = true; }
+      if (isCategoryModalOpen) { setIsCategoryModalOpen(false); closedAny = true; }
+      if (isBillingModalOpen) { setIsBillingModalOpen(false); closedAny = true; }
+      if (isShareModalOpen) { setIsShareModalOpen(false); closedAny = true; }
+      if (isDebtorInfoModalOpen) { setIsDebtorInfoModalOpen(false); closedAny = true; }
+      if (isDebtorExtraConfirmModalOpen) { setIsDebtorExtraConfirmModalOpen(false); closedAny = true; }
+      if (isBulkConfirmOpen) { setIsBulkConfirmOpen(false); closedAny = true; }
+      if (showDiscardConfirm) { setShowDiscardConfirm(false); closedAny = true; }
+      if (isRecurringActionModalOpen) { setIsRecurringActionModalOpen(false); closedAny = true; }
+      if (isDeleteConfirmModalOpen) { setIsDeleteConfirmModalOpen(false); closedAny = true; }
+      if (isDeleteAdditionalSalaryConfirmModalOpen) { setIsDeleteAdditionalSalaryConfirmModalOpen(false); closedAny = true; }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [
+    isAddModalOpen, isDebtorModalOpen, isSalaryModalOpen, isAdditionalSalaryModalOpen,
+    isAdditionalSalaryListModalOpen, isSalaryApplyModalOpen, isTributeModalOpen, 
+    isAdminPanelOpen, isCategoryModalOpen, isBillingModalOpen, isShareModalOpen,
+    isDebtorInfoModalOpen, isDebtorExtraConfirmModalOpen, isBulkConfirmOpen, 
+    showDiscardConfirm, isRecurringActionModalOpen, isDeleteConfirmModalOpen, 
+    isDeleteAdditionalSalaryConfirmModalOpen
+  ]);
+
+  useEffect(() => {
+    const anyModalOpen = isAddModalOpen || isDebtorModalOpen || isSalaryModalOpen || 
+                         isAdditionalSalaryModalOpen || isAdditionalSalaryListModalOpen ||
+                         isSalaryApplyModalOpen || isTributeModalOpen || isAdminPanelOpen || 
+                         isCategoryModalOpen || isBillingModalOpen || isShareModalOpen || 
+                         isDebtorInfoModalOpen || isDebtorExtraConfirmModalOpen ||
+                         isBulkConfirmOpen || showDiscardConfirm || isRecurringActionModalOpen ||
+                         isDeleteConfirmModalOpen || isDeleteAdditionalSalaryConfirmModalOpen;
+    
+    if (anyModalOpen) {
+      if (window.location.hash !== '#modal') {
+        window.history.pushState(null, '', '#modal');
+      }
+    } else {
+      if (window.location.hash === '#modal') {
+        window.history.back();
+      }
+    }
+  }, [
+    isAddModalOpen, isDebtorModalOpen, isSalaryModalOpen, isAdditionalSalaryModalOpen,
+    isAdditionalSalaryListModalOpen, isSalaryApplyModalOpen, isTributeModalOpen, 
+    isAdminPanelOpen, isCategoryModalOpen, isBillingModalOpen, isShareModalOpen,
+    isDebtorInfoModalOpen, isDebtorExtraConfirmModalOpen, isBulkConfirmOpen, 
+    showDiscardConfirm, isRecurringActionModalOpen, isDeleteConfirmModalOpen, 
+    isDeleteAdditionalSalaryConfirmModalOpen
+  ]);
 
   const isExpenseFormDirty = () => {
     if (editingExpense) {
@@ -1990,6 +2318,7 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
       notes: expense.notes || "",
       date: expense.date,
       dueDate: expense.dueDate || "",
+      calculationType: "monthly",
     });
     setIsAddModalOpen(true);
   };
@@ -2043,6 +2372,7 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
       notes: "",
       date: today,
       dueDate: "",
+      calculationType: "monthly",
     });
     setEditingExpense(null);
     setValidationError(null);
@@ -2203,6 +2533,45 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
               <p className="text-blue-300/60">Dica: Você pode instalar este app no seu celular para acesso rápido!</p>
             </div>
           </motion.div>
+        ) : appUserStatus === 'pending' || appUserStatus === 'rejected' ? (
+          /* Blocked Screen */
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="flex flex-col items-center justify-center min-h-[80vh] space-y-8 text-center"
+          >
+            <div className="space-y-4">
+              <div className="liquid-glass p-6 rounded-3xl inline-block mx-auto relative group">
+                <ShieldAlert className="w-16 h-16 text-yellow-500" />
+              </div>
+              <h1 className="text-3xl font-bold tracking-tight">O acesso não foi autorizado</h1>
+              <p className="text-white/70 max-w-sm mx-auto">
+                {appUserStatus === 'pending' 
+                  ? "Sua conta está aguardando aprovação. Um administrador precisa liberar seu acesso." 
+                  : "Sua solicitação de acesso foi recusada. Você pode tentar reenviar o pedido."}
+              </p>
+            </div>
+            
+            <div className="flex flex-col gap-4 w-full max-w-xs">
+              {appUserStatus === 'rejected' && (
+                <Button 
+                  onClick={() => handleUpdateAppUserStatus(user.uid, 'pending')}
+                  className="bg-blue-500 text-white hover:bg-blue-600 font-bold px-8 py-6 rounded-2xl text-lg shadow-2xl flex items-center justify-center gap-3 transition-all hover:scale-105"
+                >
+                  Enviar Novo Pedido
+                </Button>
+              )}
+              
+              <Button 
+                onClick={logout}
+                variant="outline"
+                className="bg-transparent border-white/20 text-white hover:bg-white/10 font-bold px-8 py-6 rounded-2xl text-lg flex items-center justify-center gap-3"
+              >
+                <LogOut className="w-6 h-6" />
+                Sair
+              </Button>
+            </div>
+          </motion.div>
         ) : (
           /* Main App Content */
           <>
@@ -2324,48 +2693,64 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
                   <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.15 }}>
                     <Card 
                       className={cn(
-                        "liquid-glass text-white overflow-hidden relative p-4 rounded-2xl h-full flex flex-col justify-between transition-all duration-300 cursor-pointer",
-                        !isTitheEnabled && "opacity-60"
+                        "liquid-glass text-white overflow-hidden relative p-4 rounded-2xl h-full flex flex-col justify-between transition-all duration-300",
+                        tributes.every(t => !t.enabled) && "opacity-60"
                       )}
-                      onClick={() => isTitheEnabled && handleToggleTithePaid()}
                     >
-                      <div className="flex justify-between items-start mb-2 relative z-10">
-                        <div className="flex flex-col">
-                          <div className="text-[10px] font-bold text-white/70 uppercase tracking-widest flex items-center gap-2">
-                            Dízimo
-                            {!isTitheEnabled && <span className="text-[8px] text-white/30 uppercase font-bold">Off</span>}
+                      <div className="flex justify-between items-start mb-2 relative z-10 w-full">
+                        <div className="flex flex-col w-full">
+                          <div className="text-[10px] font-bold text-white/70 uppercase tracking-widest flex items-center justify-between w-full">
+                            Tributos
+                            <Button
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={(e) => { e.stopPropagation(); setEditingTribute(null); setIsTributeModalOpen(true); }}
+                              className="h-4 w-4 rounded-full bg-white/10 text-white hover:bg-white/20 ml-1"
+                            >
+                              <Plus className="w-2.5 h-2.5" />
+                            </Button>
                           </div>
-                        </div>
-                        <div className="flex items-center gap-1 sm:gap-2">
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); handleToggleTithe(); }}
-                            className={cn(
-                              "w-8 h-4 sm:w-10 sm:h-5 rounded-full relative transition-colors duration-200",
-                              isTitheEnabled ? "bg-blue-500" : "bg-white/10"
-                            )}
-                          >
-                            <motion.div 
-                              animate={{ x: isTitheEnabled ? (typeof window !== 'undefined' && window.innerWidth < 640 ? 16 : 20) : 2 }}
-                              className="w-3 h-3 sm:w-4 sm:h-4 bg-white rounded-full absolute top-0.5"
-                            />
-                          </button>
                         </div>
                       </div>
                       <div>
                         <div className="flex items-baseline gap-1 overflow-hidden">
-                          <span className="text-[10px] opacity-50 font-bold">R$</span>
-                          <div className={cn(
-                            "text-lg sm:text-xl font-bold truncate",
-                            isTitheEnabled ? (isTithePaid ? "text-green-300" : "text-red-300") : "text-white/40"
-                          )}>
-                            {titheValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          <span className="text-[10px] opacity-50 font-bold">- R$</span>
+                          <div className="text-lg sm:text-xl font-bold truncate text-red-300">
+                            {totalTributesDiscount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                           </div>
                         </div>
-                        {isTitheEnabled && (
-                          <div className="mt-2 text-[9px] uppercase font-bold tracking-tighter opacity-40">
-                            {isTithePaid ? "✓ Pago" : "○ Pendente"}
+                      </div>
+                      <div className="flex flex-col gap-2 border-t border-white/5 pt-3 mt-2 flex-1">
+                        {tributes.map(tribute => (
+                          <div key={tribute.id} className="flex justify-between items-center text-[10px] sm:text-[12px] uppercase tracking-tight group">
+                            <span 
+                              className="text-white/40 group-hover:text-white/70 transition-colors flex items-center gap-1 cursor-pointer" 
+                              onClick={() => { setEditingTribute(tribute); setIsTributeModalOpen(true); }}
+                            >
+                              <Edit2 className="w-2.5 h-2.5" />
+                              {tribute.name} ({tribute.percentage}%)
+                            </span>
+                            <div className="flex items-center gap-2">
+                              {tribute.enabled && (
+                                <span className="text-red-400 font-bold text-[9px] sm:text-[10px]">
+                                  -{formatCurrency(tribute.base === 'main' ? salary * (tribute.percentage/100) : grossIncome * (tribute.percentage/100))}
+                                </span>
+                              )}
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); handleToggleTribute(tribute.id, !tribute.enabled); }}
+                                className={cn(
+                                  "w-6 h-3 sm:w-8 sm:h-4 rounded-full relative transition-colors duration-200 flex-shrink-0",
+                                  tribute.enabled ? "bg-red-500" : "bg-white/10"
+                                )}
+                              >
+                                <motion.div 
+                                  animate={{ x: tribute.enabled ? (typeof window !== 'undefined' && window.innerWidth < 640 ? 12 : 16) : 2 }}
+                                  className="w-2 h-2 sm:w-3 sm:h-3 bg-white rounded-full absolute top-0.5"
+                                />
+                              </button>
+                            </div>
                           </div>
-                        )}
+                        ))}
                       </div>
                     </Card>
                   </motion.div>
@@ -2467,6 +2852,18 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
                       {fixedExpenses.length} itens
                     </Badge>
                   </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleMarkAllFixedPaid();
+                    }}
+                    className="h-8 text-[10px] uppercase font-bold text-blue-300 hover:text-blue-200 hover:bg-blue-300/10 gap-1.5"
+                  >
+                    <CheckCheck className="w-3.5 h-3.5" />
+                    Pagar Todas
+                  </Button>
                 </button>
                 <AnimatePresence initial={false}>
                   {isFixedExpensesExpanded && (
@@ -2555,6 +2952,18 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
                   <Badge variant="outline" className="text-white border-white/30">
                     {variableExpenses.length} itens
                   </Badge>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleMarkAllVariablePaid();
+                    }}
+                    className="h-8 text-[10px] uppercase font-bold text-blue-300 hover:text-blue-200 hover:bg-blue-300/10 gap-1.5"
+                  >
+                    <CheckCheck className="w-3.5 h-3.5" />
+                    Pagar Todas
+                  </Button>
                 </div>
               </button>
               
@@ -2575,36 +2984,49 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
                           </div>
                         ) : (
                           (() => {
-                            // Group expenses by date (YYYY-MM-DD)
-                            const grouped: Record<string, Expense[]> = {};
+                            // Group expenses by week
+                            const weeks: Record<string, Expense[]> = {
+                              "Semana 1 (01-07)": [],
+                              "Semana 2 (08-14)": [],
+                              "Semana 3 (15-21)": [],
+                              "Semana 4 (22+)": [],
+                            };
+                            
                             variableExpenses.forEach(e => {
-                              const dateKey = e.date.split('T')[0];
-                              if (!grouped[dateKey]) grouped[dateKey] = [];
-                              grouped[dateKey].push(e);
+                              const day = parseInt(e.date.split('-')[2]);
+                              if (day <= 7) weeks["Semana 1 (01-07)"].push(e);
+                              else if (day <= 14) weeks["Semana 2 (08-14)"].push(e);
+                              else if (day <= 21) weeks["Semana 3 (15-21)"].push(e);
+                              else weeks["Semana 4 (22+)"].push(e);
                             });
 
-                            // Sort dates descending (newest first) or ascending?
-                            // Usually, daily logs are newest first or chronologically.
-                            // The filtered list is already sorted by date ascending (at line 1250).
-                            // Let's keep chronological for the month view.
-                            return Object.keys(grouped).sort().map(dateStr => {
-                              const date = new Date(dateStr + "T12:00:00");
-                              const dayOfWeek = date.toLocaleString('pt-BR', { weekday: 'long' });
-                              const formattedDate = formatDate(dateStr);
-                              const dailyTotal = grouped[dateStr].reduce((sum, exp) => sum + exp.value, 0);
+                            return Object.keys(weeks).map(weekName => {
+                              const weekExpenses = weeks[weekName];
+                              if (weekExpenses.length === 0) return null;
+                              
+                              const weekTotal = weekExpenses.reduce((sum, exp) => sum + exp.value, 0);
 
                               return (
-                                <div key={dateStr} className="space-y-3">
+                                <div key={weekName} className="space-y-3">
                                   <div className="flex items-center gap-3">
                                     <div className="h-px flex-1 bg-white/10" />
                                     <div className="text-[10px] uppercase font-bold text-white/40 tracking-widest flex items-center gap-2">
                                       <CalendarIcon className="w-3 h-3" />
-                                      {formattedDate} • <span className="text-blue-300 capitalize">{dayOfWeek}</span> • <span className="text-green-400 font-bold">{formatCurrency(dailyTotal)}</span>
+                                      {weekName} • <span className="text-green-400 font-bold">{formatCurrency(weekTotal)}</span>
                                     </div>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleMarkWeekPaid(weekExpenses)}
+                                      className="h-7 text-[9px] uppercase font-bold text-blue-300 hover:text-blue-200 hover:bg-blue-300/10 px-2 flex items-center gap-1.5"
+                                    >
+                                      <CheckCircle className="w-3 h-3" />
+                                      Pagar Semana
+                                    </Button>
                                     <div className="h-px flex-1 bg-white/10" />
                                   </div>
                                   <div className="space-y-3">
-                                    {grouped[dateStr].map(expense => {
+                                    {weekExpenses.map(expense => {
                                       let installmentInfo = "";
                                       if (expense.isRecurring && expense.repeatCount && expense.repeatCount > 1) {
                                         if (expense.installmentIndex) {
@@ -2925,11 +3347,12 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
                       fontSize={10}
                       tickLine={false}
                       axisLine={false}
-                      tickFormatter={(value) => `R$ ${value}`}
+                      tickFormatter={(value) => formatCurrency(value)}
                     />
                     <Tooltip 
                       contentStyle={{ backgroundColor: '#04142c', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '12px' }}
                       itemStyle={{ fontSize: '12px' }}
+                      formatter={(value: number) => formatCurrency(value)}
                     />
                     <Legend wrapperStyle={{ paddingTop: '20px', fontSize: '10px' }} />
                     <Bar dataKey="rendimentos" name="Rendimentos" fill="#4ade80" radius={[4, 4, 0, 0]} />
@@ -3467,10 +3890,11 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
               <div className="relative">
                 <Input
                   id="modal-salary"
-                  type="number"
-                  value={tempSalary || ""}
-                  onChange={(e) => setTempSalary(parseFloat(e.target.value) || 0)}
-                  className="bg-white/10 border-white/10 text-white pl-10 h-12 rounded-xl focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  type="text"
+                  inputMode="numeric"
+                  value={formatCurrencyInput(tempSalary)}
+                  onChange={(e) => setTempSalary(parseCurrencyInput(e.target.value))}
+                  className="bg-white/10 border-white/10 text-white pl-10 h-12 rounded-xl focus:ring-blue-500"
                   placeholder="0,00"
                 />
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 font-bold">R$</span>
@@ -3482,10 +3906,11 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
               <div className="relative">
                 <Input
                   id="modal-secondarySalary"
-                  type="number"
-                  value={tempSecondarySalary || ""}
-                  onChange={(e) => setTempSecondarySalary(parseFloat(e.target.value) || 0)}
-                  className="bg-white/10 border-white/10 text-white pl-10 h-12 rounded-xl focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  type="text"
+                  inputMode="numeric"
+                  value={formatCurrencyInput(tempSecondarySalary)}
+                  onChange={(e) => setTempSecondarySalary(parseCurrencyInput(e.target.value))}
+                  className="bg-white/10 border-white/10 text-white pl-10 h-12 rounded-xl focus:ring-blue-500"
                   placeholder="0,00"
                 />
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 font-bold">R$</span>
@@ -3550,6 +3975,89 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Tribute Modal */}
+      <Dialog open={isTributeModalOpen} onOpenChange={setIsTributeModalOpen}>
+        <DialogContent 
+          className="bg-[#04142c] sm:bg-white/10 sm:backdrop-blur-2xl border-white/10 text-white w-full h-[100dvh] sm:h-auto sm:max-w-[425px] sm:rounded-3xl p-0 sm:p-6 flex flex-col m-0 max-w-none"
+        >
+          <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-6">
+            <DialogHeader className="text-left flex-shrink-0">
+              <DialogTitle className="text-2xl font-bold flex items-center gap-2">
+                {editingTribute ? "Editar Tributo" : "Novo Tributo"}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="grid gap-6">
+              <div className="grid gap-2">
+                <Label htmlFor="tribute-name" className="text-white/70">Nome do Tributo</Label>
+                <Input
+                  id="tribute-name"
+                  value={tributeFormData.name}
+                  onChange={(e) => setTributeFormData({ ...tributeFormData, name: e.target.value })}
+                  className="bg-white/10 border-white/10 text-white h-12 rounded-xl"
+                  placeholder="Ex: Dízimo, Passagem"
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="tribute-percentage" className="text-white/70">Porcentagem (%)</Label>
+                <Input
+                  id="tribute-percentage"
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={tributeFormData.percentage}
+                  onChange={(e) => setTributeFormData({ ...tributeFormData, percentage: parseFloat(e.target.value) || 0 })}
+                  className="bg-white/10 border-white/10 text-white h-12 rounded-xl"
+                  placeholder="Ex: 10"
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label className="text-white/70">Base de Cálculo</Label>
+                <Select 
+                  value={tributeFormData.base} 
+                  onValueChange={(val: 'main' | 'total') => setTributeFormData({ ...tributeFormData, base: val })}
+                >
+                  <SelectTrigger className="bg-white/10 border-white/10 text-white h-12 rounded-xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white/10 backdrop-blur-2xl border-white/10 text-white">
+                    <SelectItem value="total">Renda Total (Salários + Extras)</SelectItem>
+                    <SelectItem value="main">Apenas Salário Principal</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {validationError && (
+                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl flex items-start gap-2 text-red-300 text-sm">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <p>{validationError}</p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3 mt-auto sm:mt-0 pt-6">
+              {editingTribute && (
+                <Button 
+                  variant="destructive" 
+                  onClick={() => { handleDeleteTribute(editingTribute.id); setIsTributeModalOpen(false); }}
+                  className="h-12 w-12 rounded-xl flex-shrink-0"
+                >
+                  <Trash2 className="w-5 h-5" />
+                </Button>
+              )}
+              <Button 
+                onClick={handleSaveTribute}
+                disabled={isSaving}
+                className="bg-blue-500 hover:bg-blue-600 text-white flex-1 rounded-xl h-12 font-bold max-w-full"
+              >
+                {isSaving ? "Salvando..." : "Salvar Tributo"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
       <Dialog open={isDebtorModalOpen} onOpenChange={(open) => {
         if (!open) {
           handleCloseModal(isDebtorModalOpen, setIsDebtorModalOpen, isDebtorFormDirty(), () => setIsDebtorModalOpen(false));
@@ -3594,11 +4102,12 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
               <div className="relative">
                 <Input
                   id="debtor-value"
-                  type="number"
-                  value={debtorFormData.value || ""}
-                  onChange={(e) => setDebtorFormData({ ...debtorFormData, value: parseFloat(e.target.value) || 0 })}
+                  type="text"
+                  inputMode="numeric"
+                  value={formatCurrencyInput(debtorFormData.value)}
+                  onChange={(e) => setDebtorFormData({ ...debtorFormData, value: parseCurrencyInput(e.target.value) })}
                   placeholder="0,00"
-                  className="bg-white/10 border-white/10 text-white pl-10 h-12 rounded-xl focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  className="bg-white/10 border-white/10 text-white pl-10 h-12 rounded-xl focus:ring-blue-500"
                 />
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 font-bold">R$</span>
               </div>
@@ -3624,33 +4133,60 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
             </div>
 
             {debtorFormData.isRecurring && (
-              <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2">
-                <div className="grid gap-2">
-                  <Label htmlFor="debtor-repeatCount" className="text-white/70 text-xs">Parcelas</Label>
-                  <Input
-                    id="debtor-repeatCount"
-                    type="number"
-                    min="2"
-                    value={debtorFormData.repeatCount}
-                    onChange={(e) => setDebtorFormData({ ...debtorFormData, repeatCount: parseInt(e.target.value) || 1 })}
-                    className="bg-white/10 border-white/10 text-white h-11 rounded-xl"
-                  />
+              <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="debtor-repeatCount" className="text-white/70 text-xs">Parcelas</Label>
+                    <Input
+                      id="debtor-repeatCount"
+                      type="number"
+                      min="2"
+                      value={debtorFormData.repeatCount}
+                      onChange={(e) => setDebtorFormData({ ...debtorFormData, repeatCount: parseInt(e.target.value) || 1 })}
+                      className="bg-white/10 border-white/10 text-white h-11 rounded-xl"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="debtor-frequency" className="text-white/70 text-xs">Frequência</Label>
+                    <Select 
+                      value={debtorFormData.repeatFrequency} 
+                      onValueChange={(val: any) => setDebtorFormData({ ...debtorFormData, repeatFrequency: val })}
+                    >
+                      <SelectTrigger id="debtor-frequency" className="bg-white/10 border-white/10 text-white h-11 rounded-xl">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white/10 backdrop-blur-2xl border-white/10 text-white">
+                        <SelectItem value="monthly">Mensal</SelectItem>
+                        <SelectItem value="yearly">Anual</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
+
                 <div className="grid gap-2">
-                  <Label htmlFor="debtor-frequency" className="text-white/70 text-xs">Frequência</Label>
+                  <Label className="text-white/70 text-xs">Tipo de Cálculo</Label>
                   <Select 
-                    value={debtorFormData.repeatFrequency} 
-                    onValueChange={(val: any) => setDebtorFormData({ ...debtorFormData, repeatFrequency: val })}
+                    value={debtorFormData.calculationType} 
+                    onValueChange={(val: "total" | "monthly") => setDebtorFormData({ ...debtorFormData, calculationType: val })}
                   >
-                    <SelectTrigger id="debtor-frequency" className="bg-white/10 border-white/10 text-white h-11 rounded-xl">
+                    <SelectTrigger className="bg-white/10 border-white/10 text-white h-11 rounded-xl">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-white/10 backdrop-blur-2xl border-white/10 text-white">
-                      <SelectItem value="monthly">Mensal</SelectItem>
-                      <SelectItem value="yearly">Anual</SelectItem>
+                      <SelectItem value="total">Dividir valor total (Parcelar)</SelectItem>
+                      <SelectItem value="monthly">Valor por parcela (Repetir)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
+
+                {debtorFormData.repeatCount > 1 && (
+                  <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl">
+                    <div className="flex items-center gap-2 text-blue-300 text-xs">
+                      <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                      <p>{getInstallmentMessage(debtorFormData)}</p>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -3757,9 +4293,10 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
               <Label htmlFor="value" className="text-white/70">Valor (R$)</Label>
               <Input
                 id="value"
-                type="number"
-                value={formData.value || ""}
-                onChange={(e) => setFormData({ ...formData, value: parseFloat(e.target.value) || 0 })}
+                type="text"
+                inputMode="numeric"
+                value={formatCurrencyInput(formData.value)}
+                onChange={(e) => setFormData({ ...formData, value: parseCurrencyInput(e.target.value) })}
                 className="bg-white/10 border-white/10 text-white placeholder:text-white/30"
                 placeholder="0,00"
               />
@@ -3832,34 +4369,61 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
                 <motion.div 
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: "auto" }}
-                  className="grid grid-cols-2 gap-4 pt-2 border-t border-white/10"
+                  className="space-y-4 pt-2 border-t border-white/10"
                 >
-                  <div className="grid gap-2">
-                    <Label htmlFor="repeatCount" className="text-xs text-white/50">Vezes</Label>
-                    <Input
-                      id="repeatCount"
-                      type="number"
-                      min="1"
-                      value={formData.repeatCount}
-                      onChange={(e) => setFormData({ ...formData, repeatCount: parseInt(e.target.value) || 1 })}
-                      className="bg-white/10 border-white/10 text-white h-8"
-                    />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="repeatCount" className="text-xs text-white/50">Vezes</Label>
+                      <Input
+                        id="repeatCount"
+                        type="number"
+                        min="1"
+                        value={formData.repeatCount}
+                        onChange={(e) => setFormData({ ...formData, repeatCount: parseInt(e.target.value) || 1 })}
+                        className="bg-white/10 border-white/10 text-white h-8"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="frequency" className="text-xs text-white/50">Frequência</Label>
+                      <Select 
+                        value={formData.repeatFrequency} 
+                        onValueChange={(v: "monthly" | "yearly") => setFormData({ ...formData, repeatFrequency: v })}
+                      >
+                        <SelectTrigger className="bg-white/10 border-white/10 text-white h-8">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white/10 backdrop-blur-2xl border-white/10 text-white">
+                          <SelectItem value="monthly">Mensal</SelectItem>
+                          <SelectItem value="yearly">Anual</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
+
                   <div className="grid gap-2">
-                    <Label htmlFor="frequency" className="text-xs text-white/50">Frequência</Label>
+                    <Label className="text-xs text-white/50">Tipo de Cálculo</Label>
                     <Select 
-                      value={formData.repeatFrequency} 
-                      onValueChange={(v: "monthly" | "yearly") => setFormData({ ...formData, repeatFrequency: v })}
+                      value={formData.calculationType} 
+                      onValueChange={(v: "total" | "monthly") => setFormData({ ...formData, calculationType: v })}
                     >
                       <SelectTrigger className="bg-white/10 border-white/10 text-white h-8">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="bg-white/10 backdrop-blur-2xl border-white/10 text-white">
-                        <SelectItem value="monthly">Mensal</SelectItem>
-                        <SelectItem value="yearly">Anual</SelectItem>
+                        <SelectItem value="total">Dividir valor total (Parcelar)</SelectItem>
+                        <SelectItem value="monthly">Valor por parcela (Repetir)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
+
+                  {formData.repeatCount > 1 && (
+                    <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl">
+                      <div className="flex items-center gap-2 text-blue-300 text-[11px]">
+                        <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                        <p>{getInstallmentMessage(formData)}</p>
+                      </div>
+                    </div>
+                  )}
                 </motion.div>
               )}
             </div>
@@ -3928,10 +4492,10 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
                 <Label htmlFor="add-salary-value" className="text-white/70">Valor (R$)</Label>
                 <Input
                   id="add-salary-value"
-                  type="number"
-                  inputMode="decimal"
-                  value={additionalSalaryFormData.value || ""}
-                  onChange={(e) => setAdditionalSalaryFormData({ ...additionalSalaryFormData, value: parseFloat(e.target.value) || 0 })}
+                  type="text"
+                  inputMode="numeric"
+                  value={formatCurrencyInput(additionalSalaryFormData.value)}
+                  onChange={(e) => setAdditionalSalaryFormData({ ...additionalSalaryFormData, value: parseCurrencyInput(e.target.value) })}
                   className="bg-white/10 border-white/20 text-white placeholder:text-white/30 h-12 rounded-xl"
                   placeholder="0,00"
                 />
@@ -4499,6 +5063,93 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Admin Panel */}
+      {isAdmin && (
+        <>
+          <button 
+            onClick={() => setIsAdminPanelOpen(true)}
+            className="fixed bottom-6 right-6 bg-gradient-to-tr from-blue-600 to-blue-400 p-4 rounded-full shadow-2xl z-50 hover:scale-110 transition-transform flex items-center justify-center border border-white/20"
+            title="Painel Administrativo"
+          >
+            <ShieldCheck className="w-6 h-6 text-white" />
+          </button>
+
+          <Dialog open={isAdminPanelOpen} onOpenChange={setIsAdminPanelOpen}>
+            <DialogContent className="bg-[#04142c]/95 backdrop-blur-3xl border-white/10 text-white rounded-[2rem] w-[95vw] sm:max-w-xl max-h-[85vh] flex flex-col p-0 overflow-hidden">
+              <div className="p-6 border-b border-white/10">
+                <DialogHeader>
+                  <DialogTitle className="text-2xl font-bold flex items-center gap-3">
+                    <ShieldCheck className="w-6 h-6 text-blue-400" />
+                    Controle de Acessos
+                  </DialogTitle>
+                </DialogHeader>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                {allAppUsers.length === 0 ? (
+                  <div className="text-center py-8 text-white/50">Nenhum usuário encontrado.</div>
+                ) : (
+                  <div className="space-y-3">
+                    {allAppUsers.map(userItem => (
+                      <div key={userItem.id} className="bg-white/5 p-4 rounded-2xl border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="font-bold flex items-center justify-between sm:justify-start gap-2">
+                            {userItem.name}
+                            <span className={cn(
+                              "text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider font-bold border",
+                              userItem.status === 'active' ? "bg-green-500/10 border-green-500/20 text-green-400" :
+                              userItem.status === 'pending' ? "bg-yellow-500/10 border-yellow-500/20 text-yellow-400" :
+                              "bg-red-500/10 border-red-500/20 text-red-400"
+                            )}>
+                              {userItem.status === 'active' ? 'Ativo' : userItem.status === 'pending' ? 'Pendente' : 'Recusado'}
+                            </span>
+                          </div>
+                          <div className="text-sm text-white/60">{userItem.email}</div>
+                          <div className="text-[10px] text-white/40 mt-1">Ref: {userItem.id}</div>
+                        </div>
+                        
+                        <div className="flex gap-2 w-full sm:w-auto">
+                          {userItem.status !== 'active' && (
+                            <Button 
+                              size="sm"
+                              onClick={() => handleUpdateAppUserStatus(userItem.id, 'active')}
+                              className="flex-1 sm:flex-none bg-green-500/20 hover:bg-green-500/30 text-green-400 font-bold border border-green-500/30"
+                            >
+                              <CheckCircle className="w-4 h-4 mr-1" />
+                              Aprovar
+                            </Button>
+                          )}
+                          {userItem.status !== 'rejected' && (
+                            <Button 
+                              size="sm"
+                              onClick={() => handleUpdateAppUserStatus(userItem.id, 'rejected')}
+                              className="flex-1 sm:flex-none bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold border border-red-500/30"
+                            >
+                              <XCircle className="w-4 h-4 mr-1" />
+                              Recusar
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              
+              <div className="p-6 border-t border-white/10">
+                <Button 
+                  onClick={() => setIsAdminPanelOpen(false)}
+                  className="w-full bg-white text-[#04142c] hover:bg-white/90 font-bold py-6 rounded-2xl text-lg"
+                >
+                  Fechar
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </>
+      )}
+
     </div>
   </div>
   );

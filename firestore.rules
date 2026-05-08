@@ -124,14 +124,26 @@ service cloud.firestore {
     // Rules
     // ===============================================================
 
+    function isAdmin() {
+      return isAuthenticated() && request.auth.token.email == "loukianoslimes@gmail.com";
+    }
+
+    match /app_users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId);
+      allow update: if isAdmin() || (isOwner(userId) && request.resource.data.status == 'pending');
+    }
+
     match /users/{userId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+
       match /settings/main {
-        allow read: if isOwner(userId);
-        allow write: if isOwner(userId) && isValidSettings(request.resource.data);
+        allow read: if isOwner(userId) || isAdmin();
+        allow write: if (isOwner(userId) || isAdmin()) && isValidSettings(request.resource.data);
       }
       
       match /expenses/{expenseId} {
-        allow read: if isOwner(userId);
+        allow read: if isOwner(userId) || isAdmin();
         allow create: if isOwner(userId) && isValidExpense(request.resource.data);
         allow update: if isOwner(userId) && isValidExpense(request.resource.data) && 
                          request.resource.data.uid == resource.data.uid;
@@ -139,7 +151,7 @@ service cloud.firestore {
       }
 
       match /additionalSalaries/{salaryId} {
-        allow read: if isOwner(userId);
+        allow read: if isOwner(userId) || isAdmin();
         allow create: if isOwner(userId) && isValidAdditionalSalary(request.resource.data);
         allow update: if isOwner(userId) && isValidAdditionalSalary(request.resource.data) && 
                          request.resource.data.uid == resource.data.uid;
@@ -147,7 +159,7 @@ service cloud.firestore {
       }
 
       match /debtors/{debtorId} {
-        allow read: if isOwner(userId);
+        allow read: if isOwner(userId) || isAdmin();
         allow create: if isOwner(userId) && isValidDebtor(request.resource.data);
         allow update: if isOwner(userId) && isValidDebtor(request.resource.data) && 
                          request.resource.data.uid == resource.data.uid;
