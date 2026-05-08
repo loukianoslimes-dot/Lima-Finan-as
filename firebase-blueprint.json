@@ -46,6 +46,20 @@
         "order": { "type": "number", "description": "Ordem de exibição na lista" }
       },
       "required": ["uid", "value", "description", "date"]
+    },
+    "feedback": {
+      "title": "Feedback do Usuário",
+      "description": "Avaliação e mensagem enviada pelo usuário.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "stars": { "type": "number", "minimum": 1, "maximum": 5 },
+        "message": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "userName", "userEmail", "stars", "message", "updatedAt"]
     }
   },
   "firestore": {
@@ -60,6 +74,10 @@
     "/users/{userId}/additionalSalaries/{salaryId}": {
       "schema": "additionalSalary",
       "description": "Lista de salários adicionais do usuário"
+    },
+    "/feedbacks/{userId}": {
+      "schema": "feedback",
+      "description": "Feedback global enviado pelo usuário"
     }
   }
 }

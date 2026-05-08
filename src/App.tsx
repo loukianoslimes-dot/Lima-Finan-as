@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Plus, Trash2, Edit2, Wallet, ArrowUpCircle, ArrowDownCircle, ChevronLeft, ChevronRight, ChevronDown, Calendar as CalendarIcon, BarChart3, Home, PieChart, TrendingUp, LogOut, LogIn, AlertCircle, GripVertical, Share2, Copy, Check, Download, Camera, Target, User as UserIcon, UserPlus, Banknote, X, Settings, Minus, ShieldAlert, RefreshCw, CheckCheck, CheckCircle, ShieldCheck, XCircle } from "lucide-react";
+import { Plus, Trash2, Edit2, Wallet, ArrowUpCircle, ArrowDownCircle, ChevronLeft, ChevronRight, ChevronDown, Calendar as CalendarIcon, BarChart3, Home, PieChart, TrendingUp, LogOut, LogIn, AlertCircle, GripVertical, Share2, Copy, Check, Download, Camera, Target, User as UserIcon, UserPlus, Banknote, X, Settings, Minus, ShieldAlert, RefreshCw, CheckCheck, CheckCircle, ShieldCheck, XCircle, Star, MessageSquare, Palette } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   BarChart, 
@@ -37,6 +37,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -547,6 +548,13 @@ export default function App() {
   const [userPhotoUrl, setUserPhotoUrl] = useState<string | null>(null);
   const APP_VERSION = "1.0.5"; // Increment this to track updates
 
+  const [feedbackRating, setFeedbackRating] = useState<number>(0);
+  const [feedbackMessage, setFeedbackMessage] = useState<string>("");
+  const [isSendingFeedback, setIsSendingFeedback] = useState(false);
+  const [feedbacks, setFeedbacks] = useState<any[]>([]);
+  const [userFeedback, setUserFeedback] = useState<any | null>(null);
+  const [adminTab, setAdminTab] = useState<'users' | 'feedbacks'>('users');
+
   const [systemConfig, setSystemConfig] = useState<{ appIconUrl?: string }>({});
   // Fetch System Config
   useEffect(() => {
@@ -851,6 +859,29 @@ export default function App() {
       setIsSyncing(snapshot.metadata.hasPendingWrites || snapshot.metadata.fromCache);
     }, (error) => handleFirestoreError(error, OperationType.GET, debtorsPath));
 
+    // Listen to User Feedback
+    const userFeedbackPath = `feedbacks/${user.uid}`;
+    const userFeedbackUnsubscribe = onSnapshot(doc(db, userFeedbackPath), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setUserFeedback(data);
+        setFeedbackRating(data.stars);
+        setFeedbackMessage(data.message);
+      }
+    }, (error) => handleFirestoreError(error, OperationType.GET, userFeedbackPath));
+
+    // Listen to all Feedbacks (Admin)
+    let allFeedbacksUnsubscribe = () => {};
+    if (isAdmin) {
+      allFeedbacksUnsubscribe = onSnapshot(collection(db, 'feedbacks'), (snapshot) => {
+        const items: any[] = [];
+        snapshot.forEach((doc) => {
+          items.push({ id: doc.id, ...doc.data() });
+        });
+        setFeedbacks(items);
+      }, (error) => handleFirestoreError(error, OperationType.GET, 'feedbacks'));
+    }
+
     return () => {
       userStatusUnsubscribe();
       allUsersUnsubscribe();
@@ -858,6 +889,8 @@ export default function App() {
       expensesUnsubscribe();
       additionalUnsubscribe();
       debtorsUnsubscribe();
+      userFeedbackUnsubscribe();
+      allFeedbacksUnsubscribe();
     };
   }, [user]);
 
@@ -2387,6 +2420,47 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
     setIsDeleteAdditionalSalaryConfirmModalOpen(true);
   };
 
+  const handleSendFeedback = async () => {
+    if (!user) return;
+    if (feedbackRating === 0) {
+      toast({
+        title: "Avaliação necessária",
+        description: "Por favor, selecione uma nota de 1 a 5 estrelas.",
+        variant: "destructive"
+      });
+      return;
+    }
+    if (!feedbackMessage.trim()) {
+      toast({
+        title: "Mensagem necessária",
+        description: "Por favor, escreva uma breve mensagem.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsSendingFeedback(true);
+    const feedbackPath = `feedbacks/${user.uid}`;
+    try {
+      await setDoc(doc(db, feedbackPath), {
+        userId: user.uid,
+        userName: user.displayName || 'Usuário',
+        userEmail: user.email,
+        stars: feedbackRating,
+        message: feedbackMessage,
+        updatedAt: new Date().toISOString()
+      });
+      toast({
+        title: "Feedback enviado!",
+        description: "Obrigado por nos ajudar a melhorar o Orin.",
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, feedbackPath);
+    } finally {
+      setIsSendingFeedback(false);
+    }
+  };
+
   const resetAdditionalSalaryForm = () => {
     const now = new Date();
     const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -2457,6 +2531,15 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
 
   const monthName = currentDate.toLocaleString("pt-BR", { month: "long" });
   const year = currentDate.getFullYear();
+
+  // Calculate Global Approval Rate from feedbacks
+  const feedbackStats = useMemo(() => {
+    if (feedbacks.length === 0) return { average: 0, count: 0, approvalRate: 0 };
+    const totalStars = feedbacks.reduce((acc, curr) => acc + curr.stars, 0);
+    const average = totalStars / feedbacks.length;
+    const approvalRate = (totalStars / (feedbacks.length * 5)) * 100;
+    return { average, count: feedbacks.length, approvalRate };
+  }, [feedbacks]);
 
   // Report Data Calculations
   const reportData = useMemo(() => {
@@ -2705,7 +2788,46 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
                 <div className="space-y-6">
 
                 {/* Summary Cards */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+                  <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.05 }}>
+                    <Card className="liquid-glass text-white overflow-hidden relative p-4 rounded-2xl h-full flex flex-col justify-between">
+                      <div className="absolute top-0 right-0 p-2 opacity-10">
+                        <ShieldCheck className="w-8 h-8" />
+                      </div>
+                      <div>
+                        <div className="text-[10px] font-bold text-white/70 uppercase mb-1 tracking-widest">Status Geral</div>
+                        <div className="flex items-baseline gap-1 mb-2">
+                          <div className="text-xl sm:text-2xl font-bold text-blue-300">
+                            {feedbackStats.approvalRate > 0 ? `${Math.round(feedbackStats.approvalRate)}%` : '---'}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-1.5 border-t border-white/5 pt-3">
+                        <div className="flex justify-between items-center text-[8px] uppercase font-bold tracking-widest text-white/30">
+                          <span>Taxa de Aprovação</span>
+                          <span className="text-yellow-400 font-bold flex items-center gap-0.5">
+                            <Star className="w-2 h-2 fill-yellow-400" />
+                            {feedbackStats.average.toFixed(1)}
+                          </span>
+                        </div>
+                        <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
+                          <motion.div 
+                            initial={{ width: 0 }}
+                            animate={{ 
+                              width: `${feedbackStats.approvalRate}%`,
+                              backgroundColor: "rgba(250, 204, 21, 0.6)"
+                            }}
+                            className="h-full rounded-full shadow-[0_0_8px_rgba(250,204,21,0.2)]"
+                          />
+                        </div>
+                        <div className="text-[8px] text-white/40 font-bold uppercase tracking-tighter mt-1">
+                          Baseado em {feedbackStats.count} feedbacks
+                        </div>
+                      </div>
+                    </Card>
+                  </motion.div>
+
                   <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.1 }}>
                     <Card className="liquid-glass text-white overflow-hidden relative p-4 rounded-2xl h-full flex flex-col justify-between">
                       <div className="absolute top-0 right-0 p-2 opacity-10">
@@ -3775,22 +3897,87 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
                 {/* Account Actions */}
                 <div className="flex flex-col gap-3">
                   <h3 className="text-sm font-bold text-white/50 uppercase tracking-widest">Ações da Conta</h3>
-                  <div className="grid grid-cols-1 gap-4">
-                    <Button 
-                      onClick={() => setIsShareModalOpen(true)}
-                      className="h-14 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 transition-all flex items-center justify-center gap-2 font-bold w-full"
-                    >
-                      <Share2 className="w-5 h-5" />
-                      Compartilhar Aplicativo
-                    </Button>
-                    <Button 
-                      onClick={logout}
-                      variant="ghost"
-                      className="h-14 rounded-2xl text-red-400/70 hover:text-red-400 hover:bg-red-500/10 transition-all flex items-center justify-center gap-2 font-bold w-full"
-                    >
-                      <LogOut className="w-5 h-5" />
-                      Sair da Conta
-                    </Button>
+                  <div className="space-y-4">
+                    {/* Feedback Section */}
+                    <div className="liquid-glass p-5 rounded-3xl border border-white/10 space-y-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-xl bg-yellow-500/20 text-yellow-400">
+                          <MessageSquare className="w-5 h-5" />
+                        </div>
+                        <h4 className="font-bold">Sua Opinião</h4>
+                      </div>
+                      
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-center bg-white/5 p-3 rounded-2xl border border-white/5">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <button
+                              key={star}
+                              onClick={() => setFeedbackRating(star)}
+                              className="p-1 transition-all hover:scale-110 active:scale-95 group"
+                            >
+                              <Star 
+                                className={cn(
+                                  "w-8 h-8 transition-all duration-300",
+                                  feedbackRating >= star ? "text-yellow-400 fill-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.4)]" : "text-white/10 group-hover:text-white/30"
+                                )} 
+                              />
+                            </button>
+                          ))}
+                        </div>
+                        
+                        {feedbackRating > 0 && (
+                          <motion.div 
+                            initial={{ opacity: 0, y: 5 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="text-[10px] uppercase font-bold text-center text-yellow-400/70 tracking-[0.2em]"
+                          >
+                            {feedbackRating === 1 && "Ruim"}
+                            {feedbackRating === 2 && "Regular"}
+                            {feedbackRating === 3 && "Bom"}
+                            {feedbackRating === 4 && "Ótimo"}
+                            {feedbackRating === 5 && "Excelente"}
+                          </motion.div>
+                        )}
+
+                        <Textarea 
+                          placeholder="Escreva seu feedback aqui..."
+                          value={feedbackMessage}
+                          onChange={(e) => setFeedbackMessage(e.target.value)}
+                          className="bg-white/5 border-white/10 text-white rounded-2xl resize-none h-28 focus:ring-yellow-400 focus:border-yellow-400/50 transition-all text-sm leading-relaxed"
+                        />
+
+                        <Button 
+                          onClick={handleSendFeedback}
+                          disabled={isSendingFeedback || (feedbackRating === userFeedback?.stars && feedbackMessage === userFeedback?.message)}
+                          className={cn(
+                            "w-full font-bold rounded-2xl h-14 flex items-center justify-center gap-2 transition-all shadow-lg",
+                            (feedbackRating === 0 || !feedbackMessage.trim()) ? "bg-white/5 text-white/20" : "bg-yellow-400 hover:bg-yellow-500 text-black shadow-yellow-400/10"
+                          )}
+                        >
+                          {isSendingFeedback ? (
+                            <RefreshCw className="w-5 h-5 animate-spin" />
+                          ) : userFeedback ? "Atualizar Feedback" : "Enviar Feedback"}
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4">
+                      <Button 
+                        onClick={() => setIsShareModalOpen(true)}
+                        className="h-14 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 transition-all flex items-center justify-center gap-2 font-bold w-full"
+                      >
+                        <Share2 className="w-5 h-5" />
+                        Compartilhar Aplicativo
+                      </Button>
+                      <Button 
+                        onClick={logout}
+                        variant="ghost"
+                        className="h-14 rounded-2xl text-red-400/70 hover:text-red-400 hover:bg-red-500/10 transition-all flex items-center justify-center gap-2 font-bold w-full"
+                      >
+                        <LogOut className="w-5 h-5" />
+                        Sair da Conta
+                      </Button>
+                    </div>
                   </div>
                 </div>
 
@@ -5235,59 +5422,120 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
                 <DialogHeader>
                   <DialogTitle className="text-2xl font-bold flex items-center gap-3">
                     <ShieldCheck className="w-6 h-6 text-blue-400" />
-                    Controle de Acessos
+                    Gerenciamento Geral
                   </DialogTitle>
                 </DialogHeader>
+                
+                <div className="flex gap-2 mt-6 bg-white/5 p-1 rounded-2xl border border-white/5">
+                  <button
+                    onClick={() => setAdminTab('users')}
+                    className={cn(
+                      "flex-1 py-3 rounded-xl font-bold text-xs uppercase tracking-widest transition-all",
+                      adminTab === 'users' ? "bg-white text-[#04142c] shadow-lg" : "text-white/40 hover:text-white/60"
+                    )}
+                  >
+                    Usuários
+                  </button>
+                  <button
+                    onClick={() => setAdminTab('feedbacks')}
+                    className={cn(
+                      "flex-1 py-3 rounded-xl font-bold text-xs uppercase tracking-widest transition-all",
+                      adminTab === 'feedbacks' ? "bg-white text-[#04142c] shadow-lg" : "text-white/40 hover:text-white/60"
+                    )}
+                  >
+                    Feedbacks ({feedbacks.length})
+                  </button>
+                </div>
               </div>
               
-              <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                {allAppUsers.length === 0 ? (
-                  <div className="text-center py-8 text-white/50">Nenhum usuário encontrado.</div>
-                ) : (
-                  <div className="space-y-3">
-                    {allAppUsers.map(userItem => (
-                      <div key={userItem.id} className="bg-white/5 p-4 rounded-2xl border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="font-bold flex items-center justify-between sm:justify-start gap-2">
-                            {userItem.name}
-                            <span className={cn(
-                              "text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider font-bold border",
-                              userItem.status === 'active' ? "bg-green-500/10 border-green-500/20 text-green-400" :
-                              userItem.status === 'pending' ? "bg-yellow-500/10 border-yellow-500/20 text-yellow-400" :
-                              "bg-red-500/10 border-red-500/20 text-red-400"
-                            )}>
-                              {userItem.status === 'active' ? 'Ativo' : userItem.status === 'pending' ? 'Pendente' : 'Recusado'}
-                            </span>
+              <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
+                {adminTab === 'users' ? (
+                  allAppUsers.length === 0 ? (
+                    <div className="text-center py-12 text-white/30 italic">Nenhum usuário encontrado.</div>
+                  ) : (
+                    <div className="space-y-3">
+                      {allAppUsers.map(userItem => (
+                        <div key={userItem.id} className="bg-white/5 p-4 rounded-2xl border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="font-bold flex items-center justify-between sm:justify-start gap-2">
+                              {userItem.name}
+                              <span className={cn(
+                                "text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider font-bold border",
+                                userItem.status === 'active' ? "bg-green-500/10 border-green-500/20 text-green-400" :
+                                userItem.status === 'pending' ? "bg-yellow-500/10 border-yellow-500/20 text-yellow-400" :
+                                "bg-red-500/10 border-red-500/20 text-red-400"
+                              )}>
+                                {userItem.status === 'active' ? 'Ativo' : userItem.status === 'pending' ? 'Pendente' : 'Recusado'}
+                              </span>
+                            </div>
+                            <div className="text-sm text-white/60">{userItem.email}</div>
                           </div>
-                          <div className="text-sm text-white/60">{userItem.email}</div>
-                          <div className="text-[10px] text-white/40 mt-1">Ref: {userItem.id}</div>
+                          
+                          <div className="flex gap-2 w-full sm:w-auto">
+                            {userItem.status !== 'active' && (
+                              <Button 
+                                size="sm"
+                                onClick={() => handleUpdateAppUserStatus(userItem.id, 'active')}
+                                className="flex-1 sm:flex-none bg-green-500/20 hover:bg-green-500/30 text-green-400 font-bold border border-green-500/30"
+                              >
+                                <CheckCircle className="w-4 h-4 mr-1" />
+                                Aprovar
+                              </Button>
+                            )}
+                            {userItem.status !== 'rejected' && (
+                              <Button 
+                                size="sm"
+                                onClick={() => handleUpdateAppUserStatus(userItem.id, 'rejected')}
+                                className="flex-1 sm:flex-none bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold border border-red-500/30"
+                              >
+                                <XCircle className="w-4 h-4 mr-1" />
+                                Recusar
+                              </Button>
+                            )}
+                          </div>
                         </div>
-                        
-                        <div className="flex gap-2 w-full sm:w-auto">
-                          {userItem.status !== 'active' && (
-                            <Button 
-                              size="sm"
-                              onClick={() => handleUpdateAppUserStatus(userItem.id, 'active')}
-                              className="flex-1 sm:flex-none bg-green-500/20 hover:bg-green-500/30 text-green-400 font-bold border border-green-500/30"
-                            >
-                              <CheckCircle className="w-4 h-4 mr-1" />
-                              Aprovar
-                            </Button>
-                          )}
-                          {userItem.status !== 'rejected' && (
-                            <Button 
-                              size="sm"
-                              onClick={() => handleUpdateAppUserStatus(userItem.id, 'rejected')}
-                              className="flex-1 sm:flex-none bg-red-500/20 hover:bg-red-500/30 text-red-400 font-bold border border-red-500/30"
-                            >
-                              <XCircle className="w-4 h-4 mr-1" />
-                              Recusar
-                            </Button>
-                          )}
+                      ))}
+                    </div>
+                  )
+                ) : (
+                  feedbacks.length === 0 ? (
+                    <div className="text-center py-12 text-white/30 italic">Nenhum feedback recebido ainda.</div>
+                  ) : (
+                    <div className="space-y-4">
+                      {feedbacks
+                        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+                        .map(fb => (
+                        <div key={fb.id} className="bg-white/5 p-5 rounded-3xl border border-white/10 space-y-3">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <div className="font-bold text-white">{fb.userName}</div>
+                              <div className="text-[10px] text-white/40">{fb.userEmail}</div>
+                            </div>
+                            <div className="flex bg-yellow-400/10 px-2 py-1 rounded-lg">
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <Star 
+                                  key={star}
+                                  className={cn(
+                                    "w-3 h-3",
+                                    fb.stars >= star ? "text-yellow-400 fill-yellow-400" : "text-white/10"
+                                  )} 
+                                />
+                              ))}
+                            </div>
+                          </div>
+                          
+                          <div className="text-sm text-white/80 leading-relaxed bg-white/5 p-4 rounded-2xl italic border border-white/5">
+                            "{fb.message}"
+                          </div>
+                          
+                          <div className="flex justify-between items-center text-[10px] text-white/30 uppercase tracking-widest font-bold">
+                            <span>ID: {fb.userId.slice(0, 8)}...</span>
+                            <span>{new Date(fb.updatedAt).toLocaleDateString('pt-BR')}</span>
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )
                 )}
               </div>
               

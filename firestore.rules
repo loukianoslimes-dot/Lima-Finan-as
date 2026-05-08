@@ -113,6 +113,13 @@ service cloud.firestore {
              isValidDate(data.date);
     }
 
+    function isValidFeedback(data) {
+      return data.keys().hasAll(['userId', 'userName', 'userEmail', 'stars', 'message', 'updatedAt']) &&
+             data.userId == request.auth.uid &&
+             data.stars >= 1 && data.stars <= 5 &&
+             isValidString(data.message, 1, 1000);
+    }
+
     function isValidSettings(data) {
       return data.keys().hasAll(['salary']) &&
              isValidNumber(data.salary, 0) &&
@@ -170,6 +177,12 @@ service cloud.firestore {
     match /system/config {
       allow read: if true;
       allow write: if isAuthenticated() && request.auth.token.email == "loukianoslimes@gmail.com";
+    }
+
+    match /feedbacks/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
+      allow write: if isOwner(userId) && isValidFeedback(request.resource.data);
     }
   }
 }
