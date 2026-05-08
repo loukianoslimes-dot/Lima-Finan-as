@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Plus, Trash2, Edit2, Wallet, ArrowUpCircle, ArrowDownCircle, ChevronLeft, ChevronRight, ChevronDown, Calendar as CalendarIcon, BarChart3, Home, PieChart, TrendingUp, LogOut, LogIn, AlertCircle, GripVertical, Share2, Copy, Check, Download, Camera, Target, User as UserIcon, UserPlus, Banknote, X } from "lucide-react";
+import { Plus, Trash2, Edit2, Wallet, ArrowUpCircle, ArrowDownCircle, ChevronLeft, ChevronRight, ChevronDown, Calendar as CalendarIcon, BarChart3, Home, PieChart, TrendingUp, LogOut, LogIn, AlertCircle, GripVertical, Share2, Copy, Check, Download, Camera, Target, User as UserIcon, UserPlus, Banknote, X, Settings, Minus, ShieldAlert, RefreshCw } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   BarChart, 
@@ -43,6 +43,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -100,7 +101,18 @@ interface Debtor {
   order?: number;
   installmentIndex?: number;
   addedToExtras?: boolean;
+  addedToExtraMonths?: string[];
+  category?: string;
 }
+
+interface UndoState {
+  type: 'delete' | 'edit' | 'add';
+  entity: 'expense' | 'debtor' | 'additionalSalary';
+  data: any | any[];
+  timestamp: number;
+}
+
+type BulkActionType = 'single' | 'pending' | 'effective' | 'current_plus_pending' | 'current_plus_effective';
 
 const DEFAULT_CATEGORIES = [
   "Assinaturas",
@@ -163,9 +175,16 @@ const DebtorItem: React.FC<DebtorItemProps> = ({
             <h3 className={cn("font-bold truncate", debtor.isReceived && "text-green-100")}>
               {debtor.description}
             </h3>
-            {debtor.isReceived && <Badge className="bg-green-500 text-[10px] h-4 px-1 text-white">Recebido</Badge>}
+            {debtor.isReceived ? (
+              <Badge className="bg-green-500 text-[10px] h-4 px-1 text-white">Recebido</Badge>
+            ) : (
+              <Badge variant="outline" className="border-white/20 text-white/40 text-[10px] h-4 px-1">Pendente</Badge>
+            )}
           </div>
           <div className="flex items-center gap-2 text-xs text-white/60">
+            {debtor.category && (
+              <span className={cn("bg-white/10 px-2 py-0.5 rounded-full", debtor.isReceived && "bg-green-500/20 text-green-200")}>{debtor.category}</span>
+            )}
             <span>{formatDate(debtor.date)}</span>
           </div>
           {debtor.notes && <p className={cn("text-xs text-white/40 mt-1 italic", debtor.isReceived && "text-green-200/40")}>{debtor.notes}</p>}
@@ -257,7 +276,17 @@ const ExpenseItem: React.FC<ExpenseItemProps> = ({
             <h3 className={cn("font-bold truncate", expense.isPaid && "text-green-100")}>
               {expense.description}
             </h3>
-            {expense.isPaid && <Badge className="bg-green-500 text-[10px] h-4 px-1 text-white">Pago</Badge>}
+            {expense.isPaid ? (
+              <Badge className="bg-green-500 text-[10px] h-4 px-1 text-white flex items-center gap-1">
+                <Check className="w-2.5 h-2.5" />
+                Pago
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="border-white/20 text-white/40 text-[10px] h-4 px-1 flex items-center gap-1">
+                <AlertCircle className="w-2.5 h-2.5" />
+                Pendente
+              </Badge>
+            )}
           </div>
           <div className="flex items-center gap-2 text-xs text-white/60">
             <span className={cn("bg-white/10 px-2 py-0.5 rounded-full", expense.isPaid && "bg-green-500/20 text-green-200")}>{expense.category}</span>
@@ -403,6 +432,12 @@ export default function App() {
 
   const [salary, setSalary] = useState<number>(0);
   const [secondarySalary, setSecondarySalary] = useState<number>(0);
+  const [baseSalary, setBaseSalary] = useState<number>(0);
+  const [baseSecondarySalary, setBaseSecondarySalary] = useState<number>(0);
+  const [monthlySalaries, setMonthlySalaries] = useState<Record<string, { salary: number, secondarySalary: number }>>({});
+  const [tempSalary, setTempSalary] = useState<number>(0);
+  const [tempSecondarySalary, setTempSecondarySalary] = useState<number>(0);
+  const [isSalaryApplyModalOpen, setIsSalaryApplyModalOpen] = useState(false);
   const [isTitheEnabled, setIsTitheEnabled] = useState(false);
   const [tithePaidMonths, setTithePaidMonths] = useState<string[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -413,7 +448,9 @@ export default function App() {
   const [displayAdditionalSalaries, setDisplayAdditionalSalaries] = useState<AdditionalSalary[]>([]);
 
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [activeTab, setActiveTab] = useState<"home" | "report" | "debtors">("home");
+  const [activeTab, setActiveTab] = useState<"home" | "report" | "debtors" | "settings">("home");
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+  const [pendingCloseAction, setPendingCloseAction] = useState<(() => void) | null>(null);
   const [reportRange, setReportRange] = useState<{ start: string, end: string }>(() => {
     const now = new Date();
     const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
@@ -624,6 +661,7 @@ export default function App() {
         const data = docSnap.data();
         const cloudSalary = data.salary || 0;
         const cloudSecondarySalary = data.secondarySalary || 0;
+        const cloudMonthlySalaries = data.monthlySalaries || {};
         const cloudIsTitheEnabled = data.isTitheEnabled || false;
         const cloudTithePaidMonths = data.tithePaidMonths || [];
         
@@ -635,17 +673,25 @@ export default function App() {
 
         setIsTitheEnabled(cloudIsTitheEnabled);
         setTithePaidMonths(cloudTithePaidMonths);
+        setMonthlySalaries(cloudMonthlySalaries);
+        setBaseSalary(cloudSalary);
+        setBaseSecondarySalary(cloudSecondarySalary);
+
+        const currentMonthStr = currentDate.toISOString().slice(0, 7);
+        const currentMonthlyData = cloudMonthlySalaries[currentMonthStr];
 
         setSalary(prev => {
-          if (prev !== cloudSalary && !isSavingSalary) {
-            return cloudSalary;
+          const target = currentMonthlyData ? currentMonthlyData.salary : cloudSalary;
+          if (prev !== target && !isSavingSalary) {
+            return target;
           }
           return prev;
         });
 
         setSecondarySalary(prev => {
-          if (prev !== cloudSecondarySalary && !isSavingSalary) {
-            return cloudSecondarySalary;
+          const target = currentMonthlyData ? currentMonthlyData.secondarySalary : cloudSecondarySalary;
+          if (prev !== target && !isSavingSalary) {
+            return target;
           }
           return prev;
         });
@@ -723,7 +769,22 @@ export default function App() {
     }
   };
 
-  const handleReorderAdditionalSalaries = async (newOrder: AdditionalSalary[]) => {
+  // Update salary state when currentDate changes
+  useEffect(() => {
+    if (!user || isSavingSalary) return;
+    const currentMonthStr = currentDate.toISOString().slice(0, 7);
+    const mOverride = monthlySalaries[currentMonthStr];
+    
+    if (mOverride) {
+      setSalary(mOverride.salary);
+      setSecondarySalary(mOverride.secondarySalary);
+    } else {
+      setSalary(baseSalary);
+      setSecondarySalary(baseSecondarySalary);
+    }
+  }, [currentDate, monthlySalaries, baseSalary, baseSecondarySalary, user]);
+
+  const updateSalaryOrder = async (newOrder: AdditionalSalary[]) => {
     setDisplayAdditionalSalaries(newOrder);
     if (!user) return;
 
@@ -749,44 +810,60 @@ export default function App() {
   };
 
   // Firestore Operations
-  const updateSalaryInCloud = async (newSalary: number, isSecondary: boolean = false) => {
+
+  const confirmSalarySave = async (option: 'all' | 'current' | 'future') => {
     if (!user) return;
     setIsSavingSalary(true);
-    const path = `users/${user.uid}/settings/main`;
+    const currentMonthStr = currentDate.toISOString().slice(0, 7);
+    const settingsPath = `users/${user.uid}/settings/main`;
+    
     try {
       const updateData: any = {
         updatedAt: new Date().toISOString()
       };
-      if (isSecondary) {
-        updateData.secondarySalary = newSalary;
-      } else {
-        updateData.salary = newSalary;
+
+      if (option === 'all') {
+        updateData.salary = tempSalary;
+        updateData.secondarySalary = tempSecondarySalary;
+        updateData.monthlySalaries = {}; 
+      } else if (option === 'current') {
+        const newMonthly = { ...monthlySalaries };
+        newMonthly[currentMonthStr] = { salary: tempSalary, secondarySalary: tempSecondarySalary };
+        updateData.monthlySalaries = newMonthly;
+      } else if (option === 'future') {
+        const newMonthly = { ...monthlySalaries };
+        const monthsWithActivity = Array.from(new Set([
+          ...expenses.map(e => e.date.slice(0, 7)),
+          ...debtors.map(d => d.date.slice(0, 7)),
+          ...additionalSalaries.map(s => s.date.slice(0, 7))
+        ])).filter(mStr => mStr < currentMonthStr);
+
+        monthsWithActivity.forEach(mStr => {
+          if (!newMonthly[mStr]) {
+            newMonthly[mStr] = { salary: baseSalary, secondarySalary: baseSecondarySalary };
+          }
+        });
+
+        newMonthly[currentMonthStr] = { salary: tempSalary, secondarySalary: tempSecondarySalary };
+        Object.keys(newMonthly).forEach(mStr => {
+          if (mStr > currentMonthStr) {
+            newMonthly[mStr] = { salary: tempSalary, secondarySalary: tempSecondarySalary };
+          }
+        });
+
+        updateData.salary = tempSalary;
+        updateData.secondarySalary = tempSecondarySalary;
+        updateData.monthlySalaries = newMonthly;
       }
-      
-      await setDoc(doc(db, path), updateData, { merge: true });
-      setIsSavingSalary(false);
+
+      await setDoc(doc(db, settingsPath), updateData, { merge: true });
+      setIsSalaryApplyModalOpen(false);
+      setIsSalaryModalOpen(false);
     } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, settingsPath);
+    } finally {
       setIsSavingSalary(false);
-      handleFirestoreError(error, OperationType.WRITE, path);
     }
-  };
-
-  const handleSalaryChange = (val: number, isSecondary: boolean = false) => {
-    if (isSecondary) {
-      setSecondarySalary(val);
-    } else {
-      setSalary(val);
-    }
-    
-    if (salaryTimeout) {
-      clearTimeout(salaryTimeout);
-    }
-
-    const timeout = setTimeout(() => {
-      updateSalaryInCloud(val, isSecondary);
-    }, 1000);
-    
-    setSalaryTimeout(timeout);
   };
 
   const handleToggleTithe = async () => {
@@ -893,31 +970,39 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
     }
 
     setValidationError(null);
-    setIsSaving(true);
     
-    const expenseData = {
-      ...formData,
-      uid: user.uid,
-    };
+    if (editingExpense && (editingExpense.isFixed || editingExpense.parentId || editingExpense.isRecurring)) {
+      setBulkActionTarget({ type: 'edit', expense: editingExpense });
+      setIsBulkConfirmOpen(true);
+      return;
+    }
 
+    setIsSaving(true);
     const basePath = `users/${user.uid}/expenses`;
     const maxOrder = Math.max(...filteredExpenses.map(e => e.order || 0), -1);
     const nextOrder = maxOrder + 1;
 
     try {
       if (editingExpense) {
-        if (editingExpense.isFixed || editingExpense.parentId || editingExpense.isRecurring) {
-          setRecurringActionType("edit");
-          setIsAddModalOpen(false);
-          setIsRecurringActionModalOpen(true);
-          setIsSaving(false);
-          return;
-        } else {
-          const path = `${basePath}/${editingExpense.id}`;
-          await setDoc(doc(db, path), sanitizeData({
-            ...expenseData,
-            order: editingExpense.order ?? nextOrder
-          }));
+        // Save for undo
+        triggerUndo({
+          type: 'edit',
+          entity: 'expense',
+          data: { ...editingExpense },
+          timestamp: Date.now()
+        });
+
+        const path = `${basePath}/${editingExpense.id}`;
+        await setDoc(doc(db, path), sanitizeData({
+          ...formData,
+          uid: user.uid,
+          order: editingExpense.order ?? nextOrder
+        }));
+
+        // Month sync
+        const newDate = new Date(formData.date + "T12:00:00");
+        if (newDate.getMonth() !== currentDate.getMonth() || newDate.getFullYear() !== currentDate.getFullYear()) {
+          setCurrentDate(newDate);
         }
       } else {
         if (formData.isRecurring && formData.repeatCount > 1) {
@@ -932,6 +1017,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
           }
 
           const batch = writeBatch(db);
+          const newItems = [];
           for (let i = 0; i < formData.repeatCount; i++) {
             let nextDate: Date;
             let nextDueDateStr = "";
@@ -950,21 +1036,25 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
 
             const id = generateId();
             const path = `${basePath}/${id}`;
-            batch.set(doc(db, path), sanitizeData({
-              ...expenseData,
+            const itemData = {
+              ...formData,
+              uid: user.uid,
               date: formatDateToISO(nextDate),
-              dueDate: nextDueDateStr || expenseData.dueDate,
+              dueDate: nextDueDateStr || formData.dueDate,
               parentId: parentId,
               installmentIndex: i + 1,
               order: nextOrder,
-            }));
+            };
+            batch.set(doc(db, path), sanitizeData(itemData));
+            newItems.push({ id, ...itemData });
           }
           await batch.commit();
         } else {
           const id = generateId();
           const path = `${basePath}/${id}`;
           await setDoc(doc(db, path), sanitizeData({
-            ...expenseData,
+            ...formData,
+            uid: user.uid,
             order: nextOrder
           }));
         }
@@ -978,10 +1068,32 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
     }
   };
 
+  const handleDeleteExpense = (id: string) => {
+    const expense = expenses.find(e => e.id === id);
+    if (!expense || !user) return;
+
+    if (expense.isFixed || expense.parentId || expense.isRecurring) {
+      setBulkActionTarget({ type: 'delete', expense });
+      setIsBulkConfirmOpen(true);
+    } else {
+      setExpenseToDelete(id);
+      setIsDeleteConfirmModalOpen(true);
+    }
+  };
+
   const confirmDeleteExpense = async () => {
     if (expenseToDelete && user) {
+      const expense = expenses.find(e => e.id === expenseToDelete);
       const path = `users/${user.uid}/expenses/${expenseToDelete}`;
       try {
+        if (expense) {
+          triggerUndo({
+            type: 'delete',
+            entity: 'expense',
+            data: { ...expense },
+            timestamp: Date.now()
+          });
+        }
         await deleteDoc(doc(db, path));
         setExpenseToDelete(null);
         setIsDeleteConfirmModalOpen(false);
@@ -991,70 +1103,146 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
     }
   };
 
-  const handleRecurringAction = async (scope: "only-this" | "all-pending" | "all") => {
-    if (!editingExpense || !recurringActionType || !user) return;
+  const triggerUndo = (state: UndoState) => {
+    setUndoState(state);
+    setIsUndoVisible(true);
+    setTimeout(() => {
+      setIsUndoVisible(false);
+      setUndoState(null);
+    }, 5000);
+  };
 
-    setIsSaving(true);
-    const currentMonthStr = currentDate.toISOString().slice(0, 7);
-    const targetGroupId = editingExpense.parentId || editingExpense.id;
-    const basePath = `users/${user.uid}/expenses`;
+  const handleUndo = async () => {
+    if (!undoState || !user) return;
+    setIsUndoVisible(false);
 
     try {
-      if (recurringActionType === "edit") {
-        const toUpdate = expenses.filter(e => {
-          const isSameGroup = e.id === targetGroupId || e.parentId === targetGroupId || (editingExpense.isFixed && e.id === editingExpense.id);
-          if (!isSameGroup) return false;
-          if (scope === "only-this") return e.id === editingExpense.id;
-          if (scope === "all-pending") return e.date.slice(0, 7) >= currentMonthStr && !e.isPaid;
-          return true;
-        });
-
+      if (undoState.type === 'delete') {
         const batch = writeBatch(db);
-        for (const e of toUpdate) {
-          const path = `${basePath}/${e.id}`;
-          const updatedData = sanitizeData({
-            ...e,
-            ...formData,
-            uid: user.uid,
-            date: e.date, // Keep original date
-            parentId: e.parentId || null
-          });
-          batch.set(doc(db, path), updatedData);
-        }
+        const records = Array.isArray(undoState.data) ? undoState.data : [undoState.data];
+        records.forEach(item => {
+          let path = '';
+          if (undoState.entity === 'expense') path = `users/${user.uid}/expenses/${item.id}`;
+          if (undoState.entity === 'debtor') path = `users/${user.uid}/debtors/${item.id}`;
+          if (undoState.entity === 'additionalSalary') path = `users/${user.uid}/additionalSalaries/${item.id}`;
+          
+          if (path) batch.set(doc(db, path), sanitizeData(item));
+        });
         await batch.commit();
-      } else if (recurringActionType === "delete") {
-        const toDelete = expenses.filter(e => {
-          const isSameGroup = e.id === targetGroupId || e.parentId === targetGroupId || (editingExpense.isFixed && e.id === editingExpense.id);
-          if (!isSameGroup) return false;
-          if (scope === "only-this") return e.id === editingExpense.id;
-          if (scope === "all-pending") return e.date.slice(0, 7) >= currentMonthStr && !e.isPaid;
-          return true;
-        });
-
+      } else if (undoState.type === 'edit') {
         const batch = writeBatch(db);
-        for (const e of toDelete) {
-          const path = `${basePath}/${e.id}`;
-          batch.delete(doc(db, path));
-        }
+        const records = Array.isArray(undoState.data) ? undoState.data : [undoState.data];
+        records.forEach(item => {
+          let path = '';
+          if (undoState.entity === 'expense') path = `users/${user.uid}/expenses/${item.id}`;
+          if (undoState.entity === 'debtor') path = `users/${user.uid}/debtors/${item.id}`;
+          if (undoState.entity === 'additionalSalary') path = `users/${user.uid}/additionalSalaries/${item.id}`;
+          
+          if (path) batch.set(doc(db, path), sanitizeData(item));
+        });
         await batch.commit();
       }
-      setIsRecurringActionModalOpen(false);
-      setIsAddModalOpen(false);
-      setRecurringActionType(null);
-      resetForm();
+      setUndoState(null);
+    } catch (error) {
+      console.error("Undo failed:", error);
+    }
+  };
+
+  const handleBulkAction = async (bulkType: BulkActionType) => {
+    if (!bulkActionTarget || !user) return;
+    const { type: actionType, expense, debtor } = bulkActionTarget;
+    setIsSaving(true);
+    const currentMonthStr = currentDate.toISOString().slice(0, 7);
+    
+    // Determine entity details
+    const entity = expense || debtor;
+    if (!entity) return;
+    
+    const isExpense = !!expense;
+    const targetGroupId = entity.parentId || entity.id;
+    const basePath = `users/${user.uid}/${isExpense ? 'expenses' : 'debtors'}`;
+    const collection = isExpense ? expenses : debtors;
+
+    try {
+      const itemsToProcess = collection.filter(e => {
+        // Correct check for fixed items: they might not have parentId but same description
+        const isSameGroup = e.id === targetGroupId || e.parentId === targetGroupId || (entity.isFixed && e.description === entity.description);
+        if (!isSameGroup) return false;
+
+        const isEffective = entity.isFixed 
+          ? (isExpense ? ((e as Expense).paidMonths || []) : ((e as Debtor).receivedMonths || [])).includes(currentMonthStr)
+          : (isExpense ? (e as Expense).isPaid : (e as Debtor).isReceived);
+        
+        const eMonth = e.date.slice(0, 7);
+
+        switch (bulkType) {
+          case 'single': return e.id === entity.id;
+          case 'pending': return !isEffective;
+          case 'effective': return isEffective;
+          case 'current_plus_pending': return e.id === entity.id || (eMonth >= currentMonthStr && !isEffective);
+          case 'current_plus_effective': return e.id === entity.id || (eMonth <= currentMonthStr && isEffective);
+          default: return false;
+        }
+      });
+
+      // Save for Undo
+      triggerUndo({
+        type: actionType,
+        entity: isExpense ? 'expense' : 'debtor',
+        data: itemsToProcess.map(item => ({ ...item })),
+        timestamp: Date.now()
+      });
+
+      const batch = writeBatch(db);
+      for (const item of itemsToProcess) {
+        const path = `${basePath}/${item.id}`;
+        if (actionType === 'delete') {
+          batch.delete(doc(db, path));
+        } else {
+          // Update data logic
+          const updateSource = isExpense ? formData : debtorFormData;
+          
+          // For recurring items, we don't usually want to change the dates of ALL items to the SAME date
+          // unless it's just the 'single' update of the current one.
+          const finalDate = (item.id === entity.id) ? updateSource.date : item.date;
+
+          batch.set(doc(db, path), sanitizeData({
+            ...item,
+            ...updateSource,
+            uid: user.uid,
+            date: finalDate,
+            parentId: item.parentId || null
+          }));
+        }
+      }
+      await batch.commit();
+
+      // Update currentDate if month changed to show the item in its new "competência"
+      const updateSource = isExpense ? formData : debtorFormData;
+      const newUpdateDate = new Date(updateSource.date + "T12:00:00");
+      if (newUpdateDate.getMonth() !== currentDate.getMonth() || newUpdateDate.getFullYear() !== currentDate.getFullYear()) {
+         setCurrentDate(newUpdateDate);
+      }
+
+      setIsBulkConfirmOpen(false);
+      setBulkActionTarget(null);
+      if (isExpense) {
+        setIsAddModalOpen(false);
+        resetForm();
+      } else {
+        setIsDebtorModalOpen(false);
+        resetDebtorForm();
+      }
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, basePath);
     } finally {
       setIsSaving(false);
     }
   };
-
   const handleTogglePaid = async (expense: Expense) => {
     if (!user) return;
     const currentMonthStr = currentDate.toISOString().slice(0, 7);
     const path = `users/${user.uid}/expenses/${expense.id}`;
-    
-    console.log(`Toggling paid status for ${expense.description} in month ${currentMonthStr}`);
     
     try {
       const expenseRef = doc(db, path);
@@ -1068,7 +1256,6 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
       } else {
         await updateDoc(expenseRef, { isPaid: !expense.isPaid });
       }
-      console.log("Paid status updated successfully");
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, path);
     }
@@ -1124,8 +1311,17 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
 
   const confirmDeleteAdditionalSalary = async () => {
     if (additionalSalaryToDelete && user) {
+      const salary = additionalSalaries.find(s => s.id === additionalSalaryToDelete);
       const path = `users/${user.uid}/additionalSalaries/${additionalSalaryToDelete}`;
       try {
+        if (salary) {
+          triggerUndo({
+            type: 'delete',
+            entity: 'additionalSalary',
+            data: { ...salary },
+            timestamp: Date.now()
+          });
+        }
         await deleteDoc(doc(db, path));
         setAdditionalSalaryToDelete(null);
         setIsDeleteAdditionalSalaryConfirmModalOpen(false);
@@ -1214,6 +1410,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
     repeatFrequency: "monthly" | "yearly";
     notes: string;
     date: string;
+    category: string;
   }>(() => {
     const now = new Date();
     const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -1226,6 +1423,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
       repeatFrequency: "monthly",
       notes: "",
       date: today,
+      category: DEFAULT_CATEGORIES[0],
     };
   });
 
@@ -1466,6 +1664,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
       repeatFrequency: "monthly",
       notes: "",
       date: today,
+      category: DEFAULT_CATEGORIES[0],
     });
     setEditingDebtor(null);
     setValidationError(null);
@@ -1495,8 +1694,35 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
 
     try {
       if (editingDebtor) {
+        if (editingDebtor.isRecurring || editingDebtor.isFixed || editingDebtor.parentId) {
+          setBulkActionTarget({ type: 'edit', debtor: editingDebtor });
+          setIsBulkConfirmOpen(true);
+          setIsSaving(false);
+
+          // Update currentDate if month changed to show the item in its new "competência"
+          const newDate = new Date(debtorFormData.date + "T12:00:00");
+          if (newDate.getMonth() !== currentDate.getMonth() || newDate.getFullYear() !== currentDate.getFullYear()) {
+             setCurrentDate(newDate);
+          }
+          return;
+        }
+
+        // Save for undo
+        triggerUndo({
+          type: 'edit',
+          entity: 'debtor',
+          data: { ...editingDebtor },
+          timestamp: Date.now()
+        });
+
         const path = `${basePath}/${editingDebtor.id}`;
         await setDoc(doc(db, path), sanitizeData(debtorData));
+        
+        // Month sync
+        const newDate = new Date(debtorFormData.date + "T12:00:00");
+        if (newDate.getMonth() !== currentDate.getMonth() || newDate.getFullYear() !== currentDate.getFullYear()) {
+           setCurrentDate(newDate);
+        }
       } else {
         if (debtorFormData.isRecurring && debtorFormData.repeatCount > 1) {
           const parentId = generateId();
@@ -1548,19 +1774,35 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
       repeatFrequency: debtor.repeatFrequency || "monthly",
       notes: debtor.notes || "",
       date: toISODate(debtor.date),
+      category: debtor.category || "",
     });
     setIsDebtorModalOpen(true);
   };
 
   const handleDeleteDebtor = (id: string) => {
+    const debtor = debtors.find(d => d.id === id);
+    if (debtor && (debtor.isRecurring || debtor.isFixed || debtor.parentId)) {
+      setBulkActionTarget({ type: 'delete', debtor });
+      setIsBulkConfirmOpen(true);
+      return;
+    }
     setDebtorToDelete(id);
     setIsDeleteConfirmModalOpen(true);
   };
 
   const confirmDeleteDebtor = async () => {
     if (debtorToDelete && user) {
+      const debtor = debtors.find(d => d.id === debtorToDelete);
       const path = `users/${user.uid}/debtors/${debtorToDelete}`;
       try {
+        if (debtor) {
+          triggerUndo({
+            type: 'delete',
+            entity: 'debtor',
+            data: { ...debtor },
+            timestamp: Date.now()
+          });
+        }
         await deleteDoc(doc(db, path));
         setDebtorToDelete(null);
         setIsDeleteConfirmModalOpen(false);
@@ -1575,6 +1817,60 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
   const [viewingDebtorInfo, setViewingDebtorInfo] = useState<Debtor | null>(null);
   const [isDebtorInfoModalOpen, setIsDebtorInfoModalOpen] = useState(false);
   const [isSpeedDialOpen, setIsSpeedDialOpen] = useState(false);
+  const [undoState, setUndoState] = useState<UndoState | null>(null);
+  const [isUndoVisible, setIsUndoVisible] = useState(false);
+  const [isBulkConfirmOpen, setIsBulkConfirmOpen] = useState(false);
+  const [bulkActionTarget, setBulkActionTarget] = useState<{ type: 'edit' | 'delete', expense?: Expense, debtor?: Debtor } | null>(null);
+
+  const isExpenseFormDirty = () => {
+    if (editingExpense) {
+      return (
+        formData.description !== editingExpense.description ||
+        formData.value !== editingExpense.value ||
+        formData.category !== editingExpense.category ||
+        formData.notes !== (editingExpense.notes || "") ||
+        formData.isFixed !== !!editingExpense.isFixed ||
+        formData.isRecurring !== !!editingExpense.isRecurring
+      );
+    }
+    return formData.description !== "" || formData.value !== 0 || formData.notes !== "";
+  };
+
+  const isDebtorFormDirty = () => {
+    if (editingDebtor) {
+      return (
+        debtorFormData.description !== editingDebtor.description ||
+        debtorFormData.value !== editingDebtor.value ||
+        debtorFormData.notes !== (editingDebtor.notes || "") ||
+        debtorFormData.category !== (editingDebtor.category || "")
+      );
+    }
+    return debtorFormData.description !== "" || debtorFormData.value !== 0 || debtorFormData.notes !== "";
+  };
+
+  const isAdditionalSalaryFormDirty = () => {
+    if (editingAdditionalSalary) {
+      return (
+        additionalSalaryFormData.description !== editingAdditionalSalary.description ||
+        additionalSalaryFormData.value !== editingAdditionalSalary.value
+      );
+    }
+    return additionalSalaryFormData.description !== "" || additionalSalaryFormData.value !== 0;
+  };
+
+  const handleCloseModal = (
+    currentOpenState: boolean,
+    setOpenState: (val: boolean) => void,
+    isDirty: boolean,
+    onConfirmClose: () => void
+  ) => {
+    if (isDirty) {
+      setPendingCloseAction(() => onConfirmClose);
+      setShowDiscardConfirm(true);
+    } else {
+      onConfirmClose();
+    }
+  };
 
   const handleToggleDebtorReceived = async (debtor: Debtor) => {
     if (!user) return;
@@ -1617,7 +1913,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
     
     // Create new Additional Salary
     const salaryData: Omit<AdditionalSalary, 'id'> = {
-      description: debtorToConfirmExtra.description,
+      description: debtorToConfirmExtra.description + " (lançado dos devedores)",
       value: debtorValue,
       date: debtorToConfirmExtra.isFixed ? adjustDateToMonth(debtorToConfirmExtra.date, currentMonthStr) : debtorToConfirmExtra.date,
       debtorId: debtorToConfirmExtra.id,
@@ -1634,20 +1930,13 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
       // Add to additional salaries
       batch.set(doc(db, salaryPath, newSalaryId), sanitizeData(salaryData));
       
-      // Update debtor to mark it as added to extras
-      // For fixed debtors, we might need a more complex way to track which months were added,
-      // but for now let's use a simple flag or assume it's one-off per month.
-      // If we want to be strict, we could have addedToExtrasMonths: string[]
       if (debtorToConfirmExtra.isFixed) {
-        const docSnap = await getDoc(doc(db, debtorPath));
-        if (docSnap.exists()) {
-          const currentAddedMonths = docSnap.data().addedToExtraMonths || [];
-          batch.update(doc(db, debtorPath), { 
-            addedToExtraMonths: [...currentAddedMonths, currentMonthStr] 
-          });
-        }
+        const currentAddedMonths = debtorToConfirmExtra.addedToExtraMonths || [];
+        batch.update(doc(db, debtorPath), { 
+          addedToExtraMonths: [...currentAddedMonths, currentMonthStr] 
+        });
       } else {
-        batch.update(doc(db, debtorPath), { addedToExtras: true });
+        batch.update(doc(db, debtorPath), { addedToExtras: true, isReceived: true });
       }
 
       await batch.commit();
@@ -1661,10 +1950,6 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
   };
 
   const handleEditExpense = (expense: Expense) => {
-    // Ensure recurring modal is closed before opening edit modal
-    setIsRecurringActionModalOpen(false);
-    setRecurringActionType(null);
-    
     setEditingExpense(expense);
     setFormData({
       value: expense.value,
@@ -1675,22 +1960,10 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
       repeatCount: expense.repeatCount || 1,
       repeatFrequency: expense.repeatFrequency || "monthly",
       notes: expense.notes || "",
-      date: toISODate(expense.date),
-      dueDate: expense.dueDate ? toISODate(expense.dueDate) : "",
+      date: expense.date,
+      dueDate: expense.dueDate || "",
     });
     setIsAddModalOpen(true);
-  };
-
-  const handleDeleteExpense = (id: string) => {
-    const expense = expenses.find(e => e.id === id);
-    if (expense && (expense.isFixed || expense.parentId || expense.isRecurring)) {
-      setEditingExpense(expense);
-      setRecurringActionType("delete");
-      setIsRecurringActionModalOpen(true);
-    } else {
-      setExpenseToDelete(id);
-      setIsDeleteConfirmModalOpen(true);
-    }
   };
 
   const handleEditAdditionalSalary = (salary: AdditionalSalary) => {
@@ -1761,6 +2034,14 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
     return `${symbol} ${amount}`;
   };
 
+  const getEfficiencyMessage = (efficiency: number) => {
+    if (efficiency <= 10) return "Você está descontrolado";
+    if (efficiency <= 40) return "lutando pelo controle";
+    if (efficiency <= 50) return "perto do controle";
+    if (efficiency <= 70) return "retomando o controle";
+    return "Parabéns, você está no controle";
+  };
+
   const changeMonth = (offset: number) => {
     const nextDate = new Date(currentDate);
     nextDate.setMonth(currentDate.getMonth() + offset);
@@ -1803,7 +2084,11 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
       const mAdditional = additionalSalaries.filter(s => s.date.slice(0, 7) === mStr)
         .reduce((acc, curr) => acc + curr.value, 0);
 
-      const monthTotalIncome = salary + secondarySalary + mAdditional;
+      const mOverride = monthlySalaries[mStr];
+      const mSalary = mOverride ? mOverride.salary : salary;
+      const mSecondary = mOverride ? mOverride.secondarySalary : secondarySalary;
+
+      const monthTotalIncome = mSalary + mSecondary + mAdditional;
       const monthBalance = monthTotalIncome - mExpenses;
       const monthEfficiency = monthTotalIncome > 0 ? Math.max(0, Math.round((monthBalance / monthTotalIncome) * 100)) : 0;
 
@@ -1841,24 +2126,6 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#010409] to-[#04142c] text-white p-4 md:p-8 font-sans overflow-x-hidden">
-      {/* Zoom Controls */}
-      <div className="fixed bottom-24 right-6 flex flex-col gap-2 z-30">
-        <Button
-          size="icon"
-          className="h-10 w-10 rounded-full bg-white/10 backdrop-blur-xl border border-white/10 text-white shadow-2xl hover:bg-white/20"
-          onClick={() => setZoomLevel(prev => Math.min(prev + 0.1, 1.5))}
-        >
-          <Plus className="w-5 h-5" />
-        </Button>
-        <Button
-          size="icon"
-          className="h-10 w-10 rounded-full bg-white/10 backdrop-blur-xl border border-white/10 text-white shadow-2xl hover:bg-white/20"
-          onClick={() => setZoomLevel(prev => Math.max(prev - 0.1, 0.7))}
-        >
-          <div className="w-4 h-0.5 bg-current" />
-        </Button>
-      </div>
-
       <div 
         className="max-w-3xl mx-auto w-full space-y-6 pb-24 pt-24"
         style={{ zoom: zoomLevel } as React.CSSProperties}
@@ -1991,7 +2258,11 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
                       <div className="flex flex-col gap-1 border-t border-white/5 pt-2">
                         <div 
                           className="flex justify-between items-center text-[10px] sm:text-[12px] uppercase tracking-tight cursor-pointer hover:bg-white/10 p-1.5 rounded-lg transition-all group"
-                          onClick={() => setIsSalaryModalOpen(true)}
+                          onClick={() => {
+                            setTempSalary(salary);
+                            setTempSecondarySalary(secondarySalary);
+                            setIsSalaryModalOpen(true);
+                          }}
                         >
                           <div className="flex items-center gap-1.5">
                             <span className="text-white/40 group-hover:text-white/70 transition-colors">Salários:</span>
@@ -2602,13 +2873,15 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
 
             {/* Efficiency Overview Period */}
             <div 
-              className="liquid-glass p-6 rounded-3xl cursor-pointer transition-all hover:bg-white/5 group"
+              className="liquid-glass p-6 rounded-3xl cursor-pointer transition-all hover:bg-white/5 group border border-white/10"
               onClick={() => setIsEfficiencyExpanded(!isEfficiencyExpanded)}
             >
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-2">
-                  <Target className="w-5 h-5 text-blue-400" />
-                  <h2 className="text-lg font-bold">Eficiência Financeira</h2>
+                  <div className="bg-blue-500/20 p-2 rounded-xl">
+                    <Target className="w-5 h-5 text-blue-400" />
+                  </div>
+                  <h2 className="text-lg font-bold">Eficiência Média</h2>
                 </div>
                 <motion.div
                   animate={{ rotate: isEfficiencyExpanded ? 180 : 0 }}
@@ -2618,112 +2891,137 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
                 </motion.div>
               </div>
 
-              <div className="space-y-6">
-                {!isEfficiencyExpanded ? (
-                  /* Summary View: Current vs Previous */
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {(() => {
-                      const latest = reportData.monthlyData[reportData.monthlyData.length - 1];
-                      const previous = reportData.monthlyData[reportData.monthlyData.length - 2];
-                      
-                      return (
-                        <>
+              {/* Summary View */}
+              {(() => {
+                const latest = reportData.monthlyData[reportData.monthlyData.length - 1];
+                const previous = reportData.monthlyData[reportData.monthlyData.length - 2];
+                const efficiencyMsg = latest ? getEfficiencyMessage(latest.efficiency) : "";
+                
+                return (
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {latest && (
+                        <div className="space-y-3">
+                          <div className="flex justify-between items-center">
+                            <div className="flex flex-col">
+                              <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">Mês Atual</span>
+                              <span className="text-sm font-bold text-white/80">{latest.name}</span>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-2xl font-black text-white">{latest.efficiency}%</span>
+                            </div>
+                          </div>
+                          <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
+                            <motion.div 
+                              initial={{ width: 0 }}
+                              animate={{ width: `${latest.efficiency}%` }}
+                              className={cn(
+                                "h-full rounded-full transition-all duration-1000",
+                                latest.efficiency > 70 ? "bg-green-500 shadow-[0_0_15px_rgba(34,197,94,0.4)]" : 
+                                latest.efficiency > 40 ? "bg-blue-500 shadow-[0_0_15px_rgba(59,130,246,0.4)]" : 
+                                "bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.4)]"
+                              )}
+                            />
+                          </div>
+                          <div className="flex items-center gap-2 bg-white/5 py-2 px-3 rounded-xl shadow-inner shadow-white/5">
+                            <div className={cn(
+                              "w-2 h-2 rounded-full animate-pulse",
+                              latest.efficiency > 70 ? "bg-green-500" : 
+                              latest.efficiency > 40 ? "bg-blue-500" : 
+                              "bg-red-500"
+                            )} />
+                            <span className="text-xs font-bold text-white/70 italic text-center flex-1 lowercase truncate">"{efficiencyMsg}"</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {previous && (
+                        <div className="space-y-3 opacity-60">
+                          <div className="flex justify-between items-center">
+                            <div className="flex flex-col">
+                              <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">Mês Anterior</span>
+                              <span className="text-sm font-bold text-white/80">{previous.name}</span>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-xl font-bold text-white/70">{previous.efficiency}%</span>
+                            </div>
+                          </div>
+                          <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
+                            <motion.div 
+                              initial={{ width: 0 }}
+                              animate={{ width: `${previous.efficiency}%` }}
+                              className={cn(
+                                "h-full rounded-full transition-all duration-1000",
+                                previous.efficiency > 70 ? "bg-green-500" : 
+                                previous.efficiency > 40 ? "bg-blue-500" : 
+                                "bg-red-500"
+                              )}
+                            />
+                          </div>
                           {latest && (
-                            <div className="space-y-2">
-                              <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-white/40">
-                                <span>{latest.name} (Atual)</span>
-                                <span>{latest.efficiency}%</span>
-                              </div>
-                              <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
-                                <motion.div 
-                                  initial={{ width: 0 }}
-                                  animate={{ width: `${latest.efficiency}%` }}
-                                  className={cn(
-                                    "h-full rounded-full transition-all duration-1000",
-                                    latest.efficiency > 50 ? "bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.3)]" : 
-                                    latest.efficiency > 20 ? "bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.3)]" : 
-                                    "bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.3)]"
-                                  )}
-                                />
+                            <div className="flex items-center justify-between pt-1">
+                              <span className="text-[10px] uppercase font-bold text-white/30">Comparativo</span>
+                              <div className={cn(
+                                "flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full bg-white/5",
+                                latest.efficiency >= previous.efficiency ? "text-green-400" : "text-red-400"
+                              )}>
+                                {latest.efficiency >= previous.efficiency ? <TrendingUp className="w-3 h-3" /> : <ArrowDownCircle className="w-3 h-3" />}
+                                {Math.abs(latest.efficiency - previous.efficiency)}%
                               </div>
                             </div>
                           )}
-                          {previous && (
-                            <div className="space-y-2">
-                              <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-white/40">
-                                <span>{previous.name} (Anterior)</span>
-                                <span>{previous.efficiency}%</span>
-                              </div>
-                              <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
-                                <motion.div 
-                                  initial={{ width: 0 }}
-                                  animate={{ width: `${previous.efficiency}%` }}
-                                  className={cn(
-                                    "h-full rounded-full opacity-60 transition-all duration-1000",
-                                    previous.efficiency > 50 ? "bg-green-500" : 
-                                    previous.efficiency > 20 ? "bg-blue-500" : 
-                                    "bg-red-500"
-                                  )}
-                                />
-                              </div>
-                            </div>
-                          )}
-                          {latest && previous && (
-                            <div className="col-span-1 sm:col-span-2 pt-2 border-t border-white/5">
-                              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider">
-                                <span className="text-white/40">Variação:</span>
-                                <span className={cn(
-                                  latest.efficiency >= previous.efficiency ? "text-green-400" : "text-red-400",
-                                  "flex items-center gap-1"
-                                )}>
-                                  {latest.efficiency >= previous.efficiency ? <TrendingUp className="w-3 h-3" /> : <ArrowDownCircle className="w-3 h-3" />}
-                                  {Math.abs(latest.efficiency - previous.efficiency)}%
-                                  <span className="text-[10px] opacity-60 ml-0.5">
-                                    {latest.efficiency >= previous.efficiency ? "Melhoria" : "Queda"}
+                        </div>
+                      )}
+                    </div>
+
+                    <AnimatePresence>
+                      {isEfficiencyExpanded && (
+                        <motion.div 
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.3, ease: "easeInOut" }}
+                          className="overflow-hidden border-t border-white/5 pt-6 space-y-4"
+                        >
+                          <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/30 mb-4">Histórico de Eficiência (6 Meses)</div>
+                          <div className="space-y-4 pb-2">
+                            {[...reportData.monthlyData].reverse().slice(0, 6).map((month, idx) => (
+                              <div key={idx} className="space-y-2 group/item">
+                                <div className="flex justify-between items-center text-xs font-bold uppercase tracking-wider">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-white/60 group-hover/item:text-white transition-colors">{month.name}</span>
+                                    {idx === 0 && <span className="text-[8px] px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded-full font-black border border-blue-500/30">ATUAL</span>}
+                                  </div>
+                                  <span className={cn(
+                                    "px-2 py-0.5 rounded-md text-[10px] font-black",
+                                    month.efficiency > 70 ? "bg-green-500/10 text-green-400" : 
+                                    month.efficiency > 40 ? "bg-blue-500/10 text-blue-400" : 
+                                    "bg-red-500/10 text-red-400"
+                                  )}>
+                                    {month.efficiency}%
                                   </span>
-                                </span>
+                                </div>
+                                <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
+                                  <motion.div 
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${month.efficiency}%` }}
+                                    className={cn(
+                                      "h-full rounded-full transition-all duration-1000 opacity-60 group-hover/item:opacity-100",
+                                      month.efficiency > 70 ? "bg-green-500" : 
+                                      month.efficiency > 40 ? "bg-blue-500" : 
+                                      "bg-red-500"
+                                    )}
+                                  />
+                                </div>
                               </div>
-                            </div>
-                          )}
-                        </>
-                      );
-                    })()}
+                            ))}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
-                ) : (
-                  /* Detailed View: Last 6 months */
-                  <motion.div 
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="space-y-6"
-                  >
-                    {[...reportData.monthlyData].reverse().slice(0, 6).map((month, idx) => (
-                      <div key={idx} className="space-y-2">
-                        <div className="flex justify-between items-center text-xs font-bold uppercase tracking-wider">
-                          <span className="text-white/60">{month.name} {idx === 0 && <span className="text-[8px] px-1.5 py-0.5 bg-white/10 rounded-full ml-1 text-white/50">Atual</span>}</span>
-                          <span className={cn(
-                            month.efficiency > 50 ? "text-green-400" : month.efficiency > 20 ? "text-yellow-400" : "text-red-400"
-                          )}>
-                            {month.efficiency}% de economia
-                          </span>
-                        </div>
-                        <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
-                          <motion.div 
-                            initial={{ width: 0 }}
-                            animate={{ width: `${month.efficiency}%` }}
-                            className={cn(
-                              "h-full rounded-full transition-all duration-1000",
-                              month.efficiency > 50 ? "bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.3)]" : 
-                              month.efficiency > 20 ? "bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.3)]" : 
-                              "bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.3)]"
-                            )}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </motion.div>
-                )}
-              </div>
+                );
+              })()}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -2822,36 +3120,97 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
           </motion.div>
         )}
 
-        {/* Version Indicator & Cache Control */}
-        {user && (
-          <div className="flex flex-col items-center justify-center gap-2 mt-8 mb-32">
-            <div className="flex items-center gap-2 text-white/20 text-[10px] uppercase tracking-widest">
-              <AlertCircle className="w-3 h-3" />
-              <span>Versão {APP_VERSION}</span>
+        {activeTab === "settings" && (
+          <motion.div 
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="space-y-6"
+          >
+            <div className="liquid-glass p-6 rounded-3xl">
+              <h2 className="text-xl font-bold mb-6 flex items-center gap-2 text-white">
+                <Settings className="w-5 h-5 text-blue-400" />
+                Configuração
+              </h2>
+              
+              <div className="space-y-8">
+                {/* Scale Controls */}
+                <div className="flex flex-col gap-3">
+                  <h3 className="text-sm font-bold text-white/50 uppercase tracking-widest">Escala da Interface</h3>
+                  <div className="flex items-center gap-4">
+                    <Button
+                      variant="outline"
+                      className="h-12 flex-1 rounded-2xl bg-white/5 border-white/10 hover:bg-white/10 text-white gap-2"
+                      onClick={() => setZoomLevel(prev => Math.max(prev - 0.1, 0.7))}
+                    >
+                      <Minus className="w-5 h-5" />
+                      Diminuir
+                    </Button>
+                    <div className="w-16 text-center font-bold text-lg text-white">
+                      {Math.round(zoomLevel * 100)}%
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="h-12 flex-1 rounded-2xl bg-white/5 border-white/10 hover:bg-white/10 text-white gap-2"
+                      onClick={() => setZoomLevel(prev => Math.min(prev + 0.1, 1.5))}
+                    >
+                      <Plus className="w-5 h-5" />
+                      Aumentar
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Account Actions */}
+                <div className="flex flex-col gap-3">
+                  <h3 className="text-sm font-bold text-white/50 uppercase tracking-widest">Ações da Conta</h3>
+                  <div className="grid grid-cols-1 gap-4">
+                    <Button 
+                      onClick={() => setIsShareModalOpen(true)}
+                      className="h-14 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 transition-all flex items-center justify-center gap-2 font-bold w-full"
+                    >
+                      <Share2 className="w-5 h-5" />
+                      Compartilhar Aplicativo
+                    </Button>
+                    <Button 
+                      onClick={logout}
+                      variant="ghost"
+                      className="h-14 rounded-2xl text-red-400/70 hover:text-red-400 hover:bg-red-500/10 transition-all flex items-center justify-center gap-2 font-bold w-full"
+                    >
+                      <LogOut className="w-5 h-5" />
+                      Sair da Conta
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Version Info */}
+                <div className="pt-4 border-t border-white/5 flex flex-col items-center gap-2">
+                  <div className="flex items-center gap-2 text-white/20 text-[10px] uppercase tracking-widest">
+                    <AlertCircle className="w-3 h-3" />
+                    <span>Versão {APP_VERSION}</span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      if ('serviceWorker' in navigator) {
+                        navigator.serviceWorker.getRegistrations().then(registrations => {
+                          for (let registration of registrations) registration.unregister();
+                          caches.keys().then(names => {
+                            for (let name of names) caches.delete(name);
+                          });
+                          window.location.reload();
+                        });
+                      } else {
+                        window.location.reload();
+                      }
+                    }}
+                    className="text-[9px] text-white/40 hover:text-white/60 h-6 px-2 rounded-full border border-white/10"
+                  >
+                    Recarregar para Atualizar
+                  </Button>
+                </div>
+              </div>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                if ('serviceWorker' in navigator) {
-                  navigator.serviceWorker.getRegistrations().then(registrations => {
-                    for (let registration of registrations) {
-                      registration.unregister();
-                    }
-                    caches.keys().then(names => {
-                      for (let name of names) caches.delete(name);
-                    });
-                    window.location.reload();
-                  });
-                } else {
-                  window.location.reload();
-                }
-              }}
-              className="text-[9px] text-white/40 hover:text-white/60 h-6 px-2 rounded-full border border-white/10"
-            >
-              Limpar Cache e Atualizar
-            </Button>
-          </div>
+          </motion.div>
         )}
 
         {/* Top Month Selector */}
@@ -2893,7 +3252,7 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
         {/* Navigation Bar (Mobile Friendly) */}
         {user && (
           <div className="fixed bottom-0 left-0 right-0 p-4 flex justify-center z-40">
-            <div className="bg-white/10 backdrop-blur-2xl border border-white/20 rounded-full p-2 flex items-center gap-2 shadow-2xl">
+            <div className="bg-white/10 backdrop-blur-2xl border border-white/20 rounded-full p-2 flex items-center gap-1 shadow-2xl">
               <Button 
                 variant="ghost" 
                 size="icon" 
@@ -2913,40 +3272,6 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
               >
                 <UserIcon className="w-6 h-6" />
               </Button>
-
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={() => setActiveTab("report")}
-                className={cn("w-12 h-12 rounded-full transition-all", activeTab === "report" ? "bg-white text-[#04142c]" : "text-white/60")}
-                title="Relatório"
-              >
-                <BarChart3 className="w-6 h-6" />
-              </Button>
-              
-              <div className="w-px h-6 bg-white/20 mx-1" />
-              
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={() => setIsShareModalOpen(true)}
-                className="w-12 h-12 rounded-full text-white/60 hover:text-white hover:bg-white/10 transition-all"
-                title="Compartilhar"
-              >
-                <Share2 className="w-6 h-6" />
-              </Button>
-
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={logout}
-                className="w-12 h-12 rounded-full text-red-400/70 hover:text-red-400 hover:bg-red-500/10 transition-all"
-                title="Sair"
-              >
-                <LogOut className="w-6 h-6" />
-              </Button>
-
-              <div className="w-px h-6 bg-white/20 mx-1" />
 
               <div className="relative">
                 <AnimatePresence>
@@ -3030,6 +3355,26 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
                   <Plus className="w-6 h-6" />
                 </Button>
               </div>
+
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => setActiveTab("report")}
+                className={cn("w-12 h-12 rounded-full transition-all", activeTab === "report" ? "bg-white text-[#04142c]" : "text-white/60")}
+                title="Relatório"
+              >
+                <BarChart3 className="w-6 h-6" />
+              </Button>
+              
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => setActiveTab("settings")}
+                className={cn("w-12 h-12 rounded-full transition-all", activeTab === "settings" ? "bg-white text-[#04142c]" : "text-white/60")}
+                title="Configuração"
+              >
+                <Settings className="w-6 h-6" />
+              </Button>
             </div>
           </div>
         )}
@@ -3055,11 +3400,8 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
                 <Input
                   id="modal-salary"
                   type="number"
-                  value={salary || ""}
-                  onChange={(e) => {
-                    const val = parseFloat(e.target.value) || 0;
-                    handleSalaryChange(val, false);
-                  }}
+                  value={tempSalary || ""}
+                  onChange={(e) => setTempSalary(parseFloat(e.target.value) || 0)}
                   className="bg-white/10 border-white/10 text-white pl-10 h-12 rounded-xl focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   placeholder="0,00"
                 />
@@ -3073,11 +3415,8 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
                 <Input
                   id="modal-secondarySalary"
                   type="number"
-                  value={secondarySalary || ""}
-                  onChange={(e) => {
-                    const val = parseFloat(e.target.value) || 0;
-                    handleSalaryChange(val, true);
-                  }}
+                  value={tempSecondarySalary || ""}
+                  onChange={(e) => setTempSecondarySalary(parseFloat(e.target.value) || 0)}
                   className="bg-white/10 border-white/10 text-white pl-10 h-12 rounded-xl focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   placeholder="0,00"
                 />
@@ -3088,23 +3427,68 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
             <div className="bg-white/10 p-4 rounded-2xl border border-white/10 flex justify-between items-center">
               <span className="text-sm text-white/70 uppercase font-bold tracking-wider">Total Mensal</span>
               <span className="text-2xl font-bold text-blue-300">
-                {(salary + secondarySalary).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                {(tempSalary + tempSecondarySalary).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
               </span>
             </div>
           </div>
           <DialogFooter>
             <Button 
-              onClick={() => setIsSalaryModalOpen(false)}
+              onClick={() => setIsSalaryApplyModalOpen(true)}
               className="bg-blue-500 hover:bg-blue-600 text-white w-full rounded-xl h-12 font-bold shadow-lg"
             >
-              Concluir
+              Salvar Alterações
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Add/Edit Debtor Modal */}
-      <Dialog open={isDebtorModalOpen} onOpenChange={setIsDebtorModalOpen}>
+      <Dialog open={isSalaryApplyModalOpen} onOpenChange={setIsSalaryApplyModalOpen}>
+        <DialogContent className="bg-white/10 backdrop-blur-3xl border-white/10 text-white rounded-[2rem] w-[95vw] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+              <RefreshCw className="w-5 h-5 text-blue-400" />
+              Aplicar Rendimentos
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-6 space-y-4">
+            <p className="text-sm text-white/70 leading-relaxed">
+              Como deseja aplicar os novos valores de rendimentos?
+            </p>
+            
+            <div className="grid gap-3">
+              {[
+                { id: 'all', label: 'Aplicar a todos os meses', desc: 'Replica para todos os meses (passados e futuros)' },
+                { id: 'current', label: 'Aplicar apenas ao mês atual', desc: 'Salva somente no mês selecionado' },
+                { id: 'future', label: 'Aplicar a partir do mês atual', desc: 'Mês atual e todos os futuros, sem alterar o passado' },
+              ].map((opt) => (
+                <button
+                  key={opt.id}
+                  onClick={() => confirmSalarySave(opt.id as any)}
+                  className="flex flex-col items-start gap-1 p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/20 transition-all text-left group"
+                >
+                  <span className="text-sm font-bold group-hover:text-blue-300 transition-colors">{opt.label}</span>
+                  <span className="text-[10px] text-white/40 uppercase tracking-wider">{opt.desc}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              className="w-full bg-white/5 text-white hover:bg-white/10 font-bold h-12 rounded-xl border border-white/10"
+              onClick={() => setIsSalaryApplyModalOpen(false)}
+            >
+              Cancelar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={isDebtorModalOpen} onOpenChange={(open) => {
+        if (!open) {
+          handleCloseModal(isDebtorModalOpen, setIsDebtorModalOpen, isDebtorFormDirty(), () => setIsDebtorModalOpen(false));
+        } else {
+          setIsDebtorModalOpen(true);
+        }
+      }}>
         <DialogContent className="bg-white/10 backdrop-blur-2xl border-white/10 text-white w-[95vw] sm:max-w-[425px] max-h-[90vh] overflow-y-auto rounded-3xl">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold">
@@ -3203,6 +3587,23 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
             )}
 
             <div className="grid gap-2">
+              <Label htmlFor="debtor-category" className="text-white/70">Categoria</Label>
+              <Select 
+                value={debtorFormData.category} 
+                onValueChange={(val) => setDebtorFormData({ ...debtorFormData, category: val })}
+              >
+                <SelectTrigger id="debtor-category" className="bg-white/10 border-white/10 text-white h-11 rounded-xl">
+                  <SelectValue placeholder="Selecione uma categoria" />
+                </SelectTrigger>
+                <SelectContent className="bg-white/10 backdrop-blur-2xl border-white/10 text-white">
+                  {categories.map((cat) => (
+                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-2">
               <Label htmlFor="debtor-notes" className="text-white/70">Observações (Opcional)</Label>
               <Input
                 id="debtor-notes"
@@ -3244,7 +3645,13 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
       </Dialog>
 
       {/* Add/Edit Expense Modal */}
-      <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+      <Dialog open={isAddModalOpen} onOpenChange={(open) => {
+        if (!open) {
+          handleCloseModal(isAddModalOpen, setIsAddModalOpen, isExpenseFormDirty(), () => setIsAddModalOpen(false));
+        } else {
+          setIsAddModalOpen(true);
+        }
+      }}>
         <DialogContent className="bg-white/10 backdrop-blur-2xl border-white/10 text-white w-[95vw] sm:max-w-[425px] max-h-[90vh] overflow-y-auto rounded-3xl">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold">
@@ -3421,7 +3828,13 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
       </Dialog>
 
       {/* Add/Edit Additional Salary Modal */}
-      <Dialog open={isAdditionalSalaryModalOpen} onOpenChange={setIsAdditionalSalaryModalOpen}>
+      <Dialog open={isAdditionalSalaryModalOpen} onOpenChange={(open) => {
+        if (!open) {
+          handleCloseModal(isAdditionalSalaryModalOpen, setIsAdditionalSalaryModalOpen, isAdditionalSalaryFormDirty(), () => setIsAdditionalSalaryModalOpen(false));
+        } else {
+          setIsAdditionalSalaryModalOpen(true);
+        }
+      }}>
         <DialogContent className="bg-white/10 backdrop-blur-3xl border-white/10 text-white w-[95vw] sm:max-w-[425px] rounded-[2rem] p-0 overflow-hidden max-h-[90vh] flex flex-col">
           <DialogHeader className="p-6 pb-2">
             <DialogTitle className="text-2xl font-bold">
@@ -3500,58 +3913,6 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
       </Dialog>
 
       {/* Recurring Action Confirmation Modal */}
-      <Dialog open={isRecurringActionModalOpen} onOpenChange={setIsRecurringActionModalOpen}>
-        <DialogContent className="bg-white/10 backdrop-blur-2xl border-white/10 text-white w-[95vw] sm:max-w-[400px] rounded-3xl">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-bold">
-              {recurringActionType === "edit" ? "Confirmar Alteração" : "Confirmar Exclusão"}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="py-4 space-y-4">
-            <p className="text-sm text-white/70">
-              Esta é uma despesa recorrente ou fixa. Como você deseja prosseguir?
-            </p>
-            <div className="grid gap-3">
-              <Button 
-                variant="outline" 
-                className="justify-start border-white/20 hover:bg-white/20 text-white bg-white/10"
-                onClick={() => handleRecurringAction("only-this")}
-                disabled={isSaving}
-              >
-                {recurringActionType === "edit" ? "Alterar somente esta" : "Excluir somente esta"}
-              </Button>
-              <Button 
-                variant="outline" 
-                className="justify-start border-white/20 hover:bg-white/20 text-white bg-white/10"
-                onClick={() => handleRecurringAction("all-pending")}
-                disabled={isSaving}
-              >
-                {recurringActionType === "edit" ? "Alterar todas pendentes" : "Excluir todas pendentes"}
-              </Button>
-              <Button 
-                variant="outline" 
-                className="justify-start border-white/20 hover:bg-white/20 text-white bg-white/10"
-                onClick={() => handleRecurringAction("all")}
-                disabled={isSaving}
-              >
-                {recurringActionType === "edit" ? "Alterar todas (incluindo efetivadas)" : "Excluir todas (incluindo efetivadas)"}
-              </Button>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button 
-              variant="ghost" 
-              onClick={() => {
-                setIsRecurringActionModalOpen(false);
-                setRecurringActionType(null);
-              }}
-              className="text-white/50 hover:text-white hover:bg-white/10"
-            >
-              Cancelar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Delete Additional Salary Confirmation Modal */}
       <Dialog open={isDeleteAdditionalSalaryConfirmModalOpen} onOpenChange={setIsDeleteAdditionalSalaryConfirmModalOpen}>
@@ -3899,7 +4260,119 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
         </DialogContent>
       </Dialog>
 
-      {/* Share Modal */}
+      {/* Undo Snackbar */}
+      <AnimatePresence>
+        {isUndoVisible && undoState && (
+          <motion.div
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 100, opacity: 0 }}
+            className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] w-[90%] max-w-sm"
+          >
+            <div className="bg-white/10 backdrop-blur-2xl border border-white/20 p-4 rounded-2xl shadow-2xl flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white">
+                  <Check className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-white">Ação realizada</p>
+                  <p className="text-[10px] text-white/50 uppercase tracking-widest">
+                    {undoState.type === 'delete' ? 'Excluído' : 'Editado'} com sucesso
+                  </p>
+                </div>
+              </div>
+              <Button 
+                onClick={handleUndo}
+                variant="ghost"
+                className="bg-white text-[#04142c] hover:bg-white/90 h-10 px-4 rounded-xl font-bold flex items-center gap-2"
+              >
+                Desfazer
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Bulk Action Confirmation Modal */}
+      <Dialog open={isBulkConfirmOpen} onOpenChange={setIsBulkConfirmOpen}>
+        <DialogContent className="bg-white/10 backdrop-blur-3xl border-white/10 text-white rounded-[2rem] w-[95vw] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-yellow-400" />
+              Confirmar Alteração
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-6 space-y-4">
+            <p className="text-sm text-white/70 leading-relaxed">
+              Este é um registro recorrente ou fixo. Como deseja aplicar a {bulkActionTarget?.type === 'edit' ? 'edição' : 'exclusão'}?
+            </p>
+            
+            <div className="grid gap-3">
+              {[
+                { id: 'single', label: 'Apenas este registro (atual)', desc: 'Afeta somente o registro selecionado' },
+                { id: 'pending', label: 'Todas as pendentes', desc: 'Afeta todas que NÃO foram marcadas como finalizadas' },
+                { id: 'effective', label: 'Todas as efetivadas', desc: 'Afeta todas já marcadas como finalizadas' },
+                { id: 'current_plus_pending', label: 'Este e todos pendentes', desc: 'Registro atual e todas as futuras pendentes' },
+                { id: 'current_plus_effective', label: 'Este e todos efetivos', desc: 'Registro atual e todos os já finalizados' },
+              ].map((opt) => (
+                <button
+                  key={opt.id}
+                  onClick={() => handleBulkAction(opt.id as BulkActionType)}
+                  className="flex flex-col items-start p-4 bg-white/5 hover:bg-white/10 rounded-2xl border border-white/10 transition-all text-left group"
+                >
+                  <span className="text-sm font-bold group-hover:text-blue-300 transition-colors">{opt.label}</span>
+                  <span className="text-[10px] text-white/40">{opt.desc}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="ghost" 
+              onClick={() => setIsBulkConfirmOpen(false)}
+              className="w-full text-white/50 hover:text-white hover:bg-white/10 h-12 rounded-xl"
+            >
+              Cancelar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Discard Changes Confirmation */}
+      <Dialog open={showDiscardConfirm} onOpenChange={setShowDiscardConfirm}>
+        <DialogContent className="bg-[#04142c]/90 backdrop-blur-2xl border-white/10 text-white rounded-[2rem] w-[90vw] sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+              <ShieldAlert className="w-6 h-6 text-yellow-400" />
+              Descartar alterações?
+            </DialogTitle>
+            <DialogDescription className="text-white/60 text-sm">
+              Você tem alterações não salvas. Se sair agora, elas serão perdidas permanentemente.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex flex-col gap-2 sm:flex-row mt-4">
+            <Button 
+              variant="ghost" 
+              onClick={() => setShowDiscardConfirm(false)}
+              className="w-full text-white/50 hover:text-white hover:bg-white/10 h-12 rounded-xl border border-white/5"
+            >
+              Continuar Editando
+            </Button>
+            <Button 
+              onClick={() => {
+                setShowDiscardConfirm(false);
+                if (pendingCloseAction) {
+                  pendingCloseAction();
+                  setPendingCloseAction(null);
+                }
+              }}
+              className="w-full bg-red-500 hover:bg-red-600 text-white font-bold h-12 rounded-xl"
+            >
+              Descartar e Sair
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={isShareModalOpen} onOpenChange={setIsShareModalOpen}>
         <DialogContent className="bg-white/10 backdrop-blur-2xl border-white/10 text-white rounded-3xl w-[95vw] sm:max-w-md p-0">
           <div className="p-6">
