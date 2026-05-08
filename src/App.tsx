@@ -701,16 +701,17 @@ export default function App() {
       if (docSnap.exists()) {
         setAppUserStatus(docSnap.data().status as AppUser['status']);
       } else {
-        // Create pending user if not exists
+        // Create pending user if not exists (or active if admin)
+        const initialStatus = isAdmin ? 'active' : 'pending';
         try {
           await setDoc(doc(db, userStatusPath), {
             id: user.uid,
             name: user.displayName || 'Unknown User',
             email: user.email || 'No Email',
-            status: 'pending',
+            status: initialStatus,
             createdAt: new Date().toISOString()
           });
-          setAppUserStatus('pending');
+          setAppUserStatus(initialStatus);
         } catch (error) {
           handleFirestoreError(error, OperationType.CREATE, userStatusPath);
         }
@@ -2533,7 +2534,7 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
               <p className="text-blue-300/60">Dica: Você pode instalar este app no seu celular para acesso rápido!</p>
             </div>
           </motion.div>
-        ) : appUserStatus === 'pending' || appUserStatus === 'rejected' ? (
+        ) : !isAdmin && (appUserStatus === 'pending' || appUserStatus === 'rejected') ? (
           /* Blocked Screen */
           <motion.div 
             initial={{ opacity: 0, scale: 0.9 }}
