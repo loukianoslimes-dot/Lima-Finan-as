@@ -474,6 +474,8 @@ export default function App() {
   const [billingMessage, setBillingMessage] = useState("");
   const [billingCopied, setBillingCopied] = useState(false);
   const [pixKey, setPixKey] = useState(() => localStorage.getItem('user-pix-key') || "");
+  const [pixBank, setPixBank] = useState(() => localStorage.getItem('user-pix-bank') || "");
+  const [pixResponsible, setPixResponsible] = useState(() => localStorage.getItem('user-pix-responsible') || "");
   const [isEditingPix, setIsEditingPix] = useState(false);
   const [pixCopied, setPixCopied] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -905,9 +907,13 @@ export default function App() {
     setTimeout(() => setBillingCopied(false), 2000);
   };
 
-  const savePixKey = (key: string) => {
+  const savePixData = (key: string, bank: string, resp: string) => {
     setPixKey(key);
+    setPixBank(bank);
+    setPixResponsible(resp);
     localStorage.setItem('user-pix-key', key);
+    localStorage.setItem('user-pix-bank', bank);
+    localStorage.setItem('user-pix-responsible', resp);
   };
 
   const copyPixToClipboard = () => {
@@ -923,16 +929,24 @@ export default function App() {
       currency: "BRL",
     }).format(debtor.value);
     
-    const formattedDate = formatDate(debtor.date);
+    // Extraímos o primeiro nome do devedor para a saudação
+    const firstName = debtor.description.split(' ')[0];
     
-    let message = `Olá!
-Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${debtor.description}, com vencimento em ${formattedDate}.`;
+    let message = `Olá ${firstName}, seguem os dados para o pagamento.
+
+Total a pagar: ${formattedValue}
+
+Detalhamento:
+• ${debtor.description}:
+${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description})`}`;
 
     if (pixKey) {
-      message += `\n\nO valor pode ser depositado no PIX: ${pixKey}`;
+      message += `\nChave PIX: ${pixKey}`;
+      if (pixBank) message += `\nBanco: ${pixBank}`;
+      if (pixResponsible) message += `\nResponsável: ${pixResponsible}`;
     }
 
-    message += `\n\nFico no aguardo do pagamento. Obrigado!`;
+    message += `\n\nObrigado!`;
     
     setBillingMessage(message);
     setSelectedDebtorForBilling(debtor);
@@ -1651,6 +1665,20 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
   const totalReceivedDebtors = useMemo(() => {
     return filteredDebtors.filter(d => d.isReceived).reduce((acc, curr) => acc + curr.value, 0);
   }, [filteredDebtors]);
+
+  const pendingDebtorsCount = useMemo(() => {
+    return filteredDebtors.filter(d => !d.isReceived).length;
+  }, [filteredDebtors]);
+
+  const receivedDebtorsCount = useMemo(() => {
+    return filteredDebtors.filter(d => d.isReceived).length;
+  }, [filteredDebtors]);
+
+  const debtorsReceivedPercentage = useMemo(() => {
+    const total = filteredDebtors.length;
+    if (total === 0) return 0;
+    return (receivedDebtorsCount / total) * 100;
+  }, [filteredDebtors, receivedDebtorsCount]);
 
   const resetDebtorForm = () => {
     const now = new Date();
@@ -2637,6 +2665,17 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
                     <div className="text-xl font-bold truncate text-blue-300">
                       {formatCurrency(totalDebtors - totalReceivedDebtors)}
                     </div>
+                    <div className="text-[10px] font-medium text-white/50 mt-1 uppercase tracking-wider">
+                      {pendingDebtorsCount} {pendingDebtorsCount === 1 ? 'restante' : 'restantes'}
+                    </div>
+                    <div className="mt-3 h-1 w-full bg-white/10 rounded-full overflow-hidden">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${100 - debtorsReceivedPercentage}%` }}
+                        className="h-full bg-blue-400"
+                        transition={{ duration: 0.8, ease: "easeOut" }}
+                      />
+                    </div>
                   </Card>
                 </motion.div>
                 <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.1 }}>
@@ -2647,6 +2686,17 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
                     <div className="text-[10px] font-bold text-white/70 uppercase mb-1 tracking-widest">Recebido</div>
                     <div className="text-xl font-bold truncate text-green-300">
                       {formatCurrency(totalReceivedDebtors)}
+                    </div>
+                    <div className="text-[10px] font-medium text-white/50 mt-1 uppercase tracking-wider">
+                      {receivedDebtorsCount} {receivedDebtorsCount === 1 ? 'recebido' : 'recebidos'}
+                    </div>
+                    <div className="mt-3 h-1 w-full bg-white/10 rounded-full overflow-hidden">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${debtorsReceivedPercentage}%` }}
+                        className="h-full bg-green-400"
+                        transition={{ duration: 0.8, ease: "easeOut" }}
+                      />
                     </div>
                   </Card>
                 </motion.div>
@@ -2663,34 +2713,46 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
                       onClick={() => setIsEditingPix(!isEditingPix)}
                       className="h-6 w-6 text-white/50 hover:text-white hover:bg-white/10"
                     >
-                      <Edit2 className="w-3 h-3" />
+                      {isEditingPix ? <X className="w-3 h-3" /> : <Edit2 className="w-3 h-3" />}
                     </Button>
                   </div>
                   
                   {isEditingPix ? (
-                    <div className="flex gap-2 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="flex flex-col gap-2 animate-in fade-in zoom-in-95 duration-200">
                       <Input 
                         value={pixKey}
                         onChange={(e) => setPixKey(e.target.value)}
-                        placeholder="CPF, E-mail, etc"
+                        placeholder="Chave PIX (CPF, E-mail, etc)"
                         className="h-8 bg-white/10 border-white/20 text-xs text-white"
-                        autoFocus
+                      />
+                      <Input 
+                        value={pixBank}
+                        onChange={(e) => setPixBank(e.target.value)}
+                        placeholder="Banco"
+                        className="h-8 bg-white/10 border-white/20 text-xs text-white"
+                      />
+                      <Input 
+                        value={pixResponsible}
+                        onChange={(e) => setPixResponsible(e.target.value)}
+                        placeholder="Responsável"
+                        className="h-8 bg-white/10 border-white/20 text-xs text-white"
                       />
                       <Button 
                         size="sm" 
-                        onClick={() => { savePixKey(pixKey); setIsEditingPix(false); }}
-                        className="h-8 bg-blue-500 hover:bg-blue-600 text-white px-2"
+                        onClick={() => { savePixData(pixKey, pixBank, pixResponsible); setIsEditingPix(false); }}
+                        className="h-8 bg-blue-500 hover:bg-blue-600 text-white w-full"
                       >
-                        <Check className="w-4 h-4" />
+                        <Check className="w-4 h-4 mr-1" />
+                        Salvar
                       </Button>
                     </div>
                   ) : (
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="text-sm font-mono font-bold truncate text-blue-100 flex-1">
-                        {pixKey || <span className="text-white/30 font-sans italic font-normal">Não cadastrada</span>}
-                      </div>
-                      {pixKey && (
-                        <div className="flex gap-1">
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-sm font-mono font-bold truncate text-blue-100 flex-1">
+                          {pixKey || <span className="text-white/30 font-sans italic font-normal">Não cadastrada</span>}
+                        </div>
+                        {pixKey && (
                           <Button 
                             variant="ghost" 
                             size="icon" 
@@ -2700,6 +2762,12 @@ Estou passando para lembrar sobre o valor de ${formattedValue} referente a ${deb
                           >
                             {pixCopied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
                           </Button>
+                        )}
+                      </div>
+                      {(pixBank || pixResponsible) && (
+                        <div className="flex flex-col text-[10px] text-white/50 uppercase tracking-tighter">
+                          {pixBank && <span>Banco: <span className="text-white/80">{pixBank}</span></span>}
+                          {pixResponsible && <span>Resp: <span className="text-white/80">{pixResponsible}</span></span>}
                         </div>
                       )}
                     </div>
