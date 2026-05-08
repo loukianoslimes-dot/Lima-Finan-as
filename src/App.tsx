@@ -2750,7 +2750,18 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
                     "rounded-2xl h-12 font-bold flex items-center justify-center gap-2 transition-all shadow-lg",
                     (!appUpdateInfo || !appUpdateInfo.isMandatory) ? "flex-1 bg-blue-500 hover:bg-blue-600 text-white shadow-blue-500/20" : "w-full bg-blue-500 hover:bg-blue-600 text-white shadow-blue-500/20"
                   )}
-                  onClick={() => updateSWFn?.(true)}
+                  onClick={async () => {
+                    try {
+                      if (updateSWFn) await updateSWFn(true);
+                    } catch(e) {}
+                    if ('serviceWorker' in navigator) {
+                      const registrations = await navigator.serviceWorker.getRegistrations();
+                      for (let registration of registrations) registration.unregister();
+                      const names = await caches.keys();
+                      for (let name of names) caches.delete(name);
+                    }
+                    window.location.reload();
+                  }}
                 >
                   <RefreshCw className="w-5 h-5" />
                   Baixar e Atualizar
@@ -2919,46 +2930,7 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
                 <div className="space-y-6">
 
                 {/* Summary Cards */}
-                <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-                  <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.05 }}>
-                    <Card className="liquid-glass text-white overflow-hidden relative p-4 rounded-2xl h-full flex flex-col justify-between">
-                      <div className="absolute top-0 right-0 p-2 opacity-10">
-                        <ShieldCheck className="w-8 h-8" />
-                      </div>
-                      <div>
-                        <div className="text-[10px] font-bold text-white/70 uppercase mb-1 tracking-widest">Status Geral</div>
-                        <div className="flex items-baseline gap-1 mb-2">
-                          <div className="text-xl sm:text-2xl font-bold text-blue-300">
-                            {feedbackStats.approvalRate > 0 ? `${Math.round(feedbackStats.approvalRate)}%` : '---'}
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="space-y-1.5 border-t border-white/5 pt-3">
-                        <div className="flex justify-between items-center text-[8px] uppercase font-bold tracking-widest text-white/30">
-                          <span>Taxa de Aprovação</span>
-                          <span className="text-yellow-400 font-bold flex items-center gap-0.5">
-                            <Star className="w-2 h-2 fill-yellow-400" />
-                            {feedbackStats.average.toFixed(1)}
-                          </span>
-                        </div>
-                        <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
-                          <motion.div 
-                            initial={{ width: 0 }}
-                            animate={{ 
-                              width: `${feedbackStats.approvalRate}%`,
-                              backgroundColor: "rgba(250, 204, 21, 0.6)"
-                            }}
-                            className="h-full rounded-full shadow-[0_0_8px_rgba(250,204,21,0.2)]"
-                          />
-                        </div>
-                        <div className="text-[8px] text-white/40 font-bold uppercase tracking-tighter mt-1">
-                          Baseado em {feedbackStats.count} feedbacks
-                        </div>
-                      </div>
-                    </Card>
-                  </motion.div>
-
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                   <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.1 }}>
                     <Card className="liquid-glass text-white overflow-hidden relative p-4 rounded-2xl h-full flex flex-col justify-between">
                       <div className="absolute top-0 right-0 p-2 opacity-10">
@@ -3153,19 +3125,12 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
                 className="liquid-glass rounded-3xl overflow-hidden"
               >
                 <div 
-                  className="w-full p-6 border-b border-white/10 flex justify-between items-center cursor-pointer hover:bg-white/5 transition-colors text-left"
-                  onClick={() => setIsFixedExpensesExpanded(!isFixedExpensesExpanded)}
-                  aria-expanded={isFixedExpensesExpanded}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      setIsFixedExpensesExpanded(!isFixedExpensesExpanded);
-                    }
-                  }}
+                  className="w-full p-6 border-b border-white/10 flex justify-between items-center transition-colors"
                 >
-                  <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setIsFixedExpensesExpanded(!isFixedExpensesExpanded)}
+                    className="flex-1 flex items-center gap-3 text-left hover:opacity-80 transition-opacity"
+                  >
                     <h2 className="text-xl font-bold">Despesas Fixas</h2>
                     <motion.div
                       animate={{ rotate: isFixedExpensesExpanded ? 180 : 0 }}
@@ -3173,7 +3138,7 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
                     >
                       <ChevronDown className="w-5 h-5 text-white/50" />
                     </motion.div>
-                  </div>
+                  </button>
                   <div className="flex items-center gap-3">
                     <div className="text-sm font-bold text-green-400 bg-green-400/10 px-3 py-1 rounded-full">
                       {formatCurrency(fixedExpenses.reduce((sum, exp) => sum + exp.value, 0))}
@@ -3262,19 +3227,12 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
               className="liquid-glass rounded-3xl overflow-hidden"
             >
               <div 
-                className="w-full p-6 border-b border-white/10 flex justify-between items-center cursor-pointer hover:bg-white/5 transition-colors text-left"
-                onClick={() => setIsVariableExpensesExpanded(!isVariableExpensesExpanded)}
-                aria-expanded={isVariableExpensesExpanded}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    setIsVariableExpensesExpanded(!isVariableExpensesExpanded);
-                  }
-                }}
+                className="w-full p-6 border-b border-white/10 flex justify-between items-center transition-colors"
               >
-                <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setIsVariableExpensesExpanded(!isVariableExpensesExpanded)}
+                  className="flex-1 flex items-center gap-3 text-left hover:opacity-80 transition-opacity"
+                >
                   <h2 className="text-xl font-bold">Despesas</h2>
                   <motion.div
                     animate={{ rotate: isVariableExpensesExpanded ? 180 : 0 }}
@@ -3282,7 +3240,7 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
                   >
                     <ChevronDown className="w-5 h-5 text-white/50" />
                   </motion.div>
-                </div>
+                </button>
                 <div className="flex items-center gap-3">
                   <div className="text-sm font-bold text-green-400 bg-green-400/10 px-3 py-1 rounded-full">
                     {formatCurrency(variableExpenses.reduce((sum, exp) => sum + exp.value, 0))}
@@ -5654,14 +5612,52 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
                     </div>
                   )
                 ) : adminTab === 'feedbacks' ? (
-                  feedbacks.length === 0 ? (
-                    <div className="text-center py-12 text-white/30 italic">Nenhum feedback recebido ainda.</div>
-                  ) : (
-                    <div className="space-y-4">
-                      {feedbacks
-                        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-                        .map(fb => (
-                        <div key={fb.id} className="bg-white/5 p-5 rounded-3xl border border-white/10 space-y-3">
+                  <div className="space-y-6">
+                    <Card className="liquid-glass text-white overflow-hidden relative p-4 rounded-2xl flex flex-col justify-between">
+                      <div className="absolute top-0 right-0 p-2 opacity-10">
+                        <ShieldCheck className="w-8 h-8" />
+                      </div>
+                      <div>
+                        <div className="text-[10px] font-bold text-white/70 uppercase mb-1 tracking-widest">Status Geral</div>
+                        <div className="flex items-baseline gap-1 mb-2">
+                          <div className="text-xl sm:text-2xl font-bold text-blue-300">
+                            {feedbackStats.approvalRate > 0 ? `${Math.round(feedbackStats.approvalRate)}%` : '---'}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-1.5 border-t border-white/5 pt-3">
+                        <div className="flex justify-between items-center text-[8px] uppercase font-bold tracking-widest text-white/30">
+                          <span>Taxa de Aprovação</span>
+                          <span className="text-yellow-400 font-bold flex items-center gap-0.5">
+                            <Star className="w-2 h-2 fill-yellow-400" />
+                            {feedbackStats.average.toFixed(1)}
+                          </span>
+                        </div>
+                        <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
+                          <motion.div 
+                            initial={{ width: 0 }}
+                            animate={{ 
+                              width: `${feedbackStats.approvalRate}%`,
+                              backgroundColor: "rgba(250, 204, 21, 0.6)"
+                            }}
+                            className="h-full rounded-full shadow-[0_0_8px_rgba(250,204,21,0.2)]"
+                          />
+                        </div>
+                        <div className="text-[8px] text-white/40 font-bold uppercase tracking-tighter mt-1">
+                          Baseado em {feedbackStats.count} feedbacks
+                        </div>
+                      </div>
+                    </Card>
+
+                    {feedbacks.length === 0 ? (
+                      <div className="text-center py-12 text-white/30 italic">Nenhum feedback recebido ainda.</div>
+                    ) : (
+                      <div className="space-y-4">
+                        {feedbacks
+                          .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+                          .map(fb => (
+                          <div key={fb.id} className="bg-white/5 p-5 rounded-3xl border border-white/10 space-y-3">
                           <div className="flex justify-between items-start">
                             <div>
                               <div className="font-bold text-white">{fb.userName}</div>
@@ -5691,7 +5687,8 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
                         </div>
                       ))}
                     </div>
-                  )
+                  )}
+                  </div>
                 ) : (
                   <div className="space-y-4">
                     <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-2xl">
