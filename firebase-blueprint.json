@@ -60,9 +60,26 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "userName", "userEmail", "stars", "message", "updatedAt"]
+    },
+    "appUpdate": {
+      "title": "Atualização do Aplicativo",
+      "description": "Informações globais sobre a próxima atualização do app configurada pelo administrador.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "version": { "type": "string" },
+        "changelog": { "type": "string" },
+        "isMandatory": { "type": "boolean" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "version", "changelog", "isMandatory", "updatedAt"]
     }
   },
   "firestore": {
+    "/systemSettings/appUpdate": {
+      "schema": "appUpdate",
+      "description": "Configuração da próxima atualização do app"
+    },
     "/users/{userId}/settings/main": {
       "schema": "userSettings",
       "description": "Configurações globais do usuário"

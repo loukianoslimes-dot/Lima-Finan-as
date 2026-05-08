@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { registerSW } from 'virtual:pwa-register';
 import { Plus, Trash2, Edit2, Wallet, ArrowUpCircle, ArrowDownCircle, ChevronLeft, ChevronRight, ChevronDown, Calendar as CalendarIcon, BarChart3, Home, PieChart, TrendingUp, LogOut, LogIn, AlertCircle, GripVertical, Share2, Copy, Check, Download, Camera, Target, User as UserIcon, UserPlus, Banknote, X, Settings, Minus, ShieldAlert, RefreshCw, CheckCheck, CheckCircle, ShieldCheck, XCircle, Star, MessageSquare, Palette } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
@@ -437,12 +438,48 @@ const AdditionalSalaryItem: React.FC<AdditionalSalaryItemProps> = ({
   );
 };
 
+interface AppUpdateInfo {
+  title: string;
+  version: string;
+  changelog: string;
+  isMandatory: boolean;
+  updatedAt: string;
+}
+
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [appUserStatus, setAppUserStatus] = useState<AppUser['status']>('pending');
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
   const [allAppUsers, setAllAppUsers] = useState<AppUser[]>([]);
   const isAdmin = user?.email === "loukianoslimes@gmail.com";
+
+  // --- PWA Update Flow ---
+  const [needRefresh, setNeedRefresh] = useState(false);
+  const [updateSWFn, setUpdateSWFn] = useState<((reloadPage?: boolean) => Promise<void>) | null>(null);
+
+  useEffect(() => {
+    const updateSW = registerSW({
+      onNeedRefresh() {
+        setNeedRefresh(true);
+      },
+      onOfflineReady() {
+        console.log('App is ready to work offline');
+      },
+    });
+    setUpdateSWFn(() => updateSW);
+  }, []);
+  // -------------------------
+
+  const [appUpdateInfo, setAppUpdateInfo] = useState<AppUpdateInfo | null>(null);
+  useEffect(() => {
+    const updatePath = "systemSettings/appUpdate";
+    const unsubscribe = onSnapshot(doc(db, updatePath), (docSnap) => {
+      if (docSnap.exists()) {
+        setAppUpdateInfo(docSnap.data() as AppUpdateInfo);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [isSyncing, setIsSyncing] = useState(true);
@@ -553,7 +590,42 @@ export default function App() {
   const [isSendingFeedback, setIsSendingFeedback] = useState(false);
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
   const [userFeedback, setUserFeedback] = useState<any | null>(null);
-  const [adminTab, setAdminTab] = useState<'users' | 'feedbacks'>('users');
+  const [adminTab, setAdminTab] = useState<'users' | 'feedbacks' | 'updates'>('users');
+  const [updateForm, setUpdateForm] = useState<AppUpdateInfo>({
+    title: '',
+    version: '',
+    changelog: '',
+    isMandatory: false,
+    updatedAt: '',
+  });
+  const [isSavingUpdate, setIsSavingUpdate] = useState(false);
+
+  // Sync update form with fetched info
+  useEffect(() => {
+    if (appUpdateInfo) {
+      setUpdateForm(appUpdateInfo);
+    }
+  }, [appUpdateInfo]);
+
+  const handleSaveAppUpdate = async () => {
+    if (!updateForm.title || !updateForm.version) {
+      alert("Título e versão são obrigatórios.");
+      return;
+    }
+    
+    setIsSavingUpdate(true);
+    try {
+      await setDoc(doc(db, "systemSettings/appUpdate"), {
+        ...updateForm,
+        updatedAt: new Date().toISOString()
+      });
+      alert("Atualização configurada. Lembre-se de fazer o deploy no Vercel.");
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, "systemSettings/appUpdate");
+    } finally {
+      setIsSavingUpdate(false);
+    }
+  };
 
   const [systemConfig, setSystemConfig] = useState<{ appIconUrl?: string }>({});
   // Fetch System Config
@@ -2423,19 +2495,11 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
   const handleSendFeedback = async () => {
     if (!user) return;
     if (feedbackRating === 0) {
-      toast({
-        title: "Avaliação necessária",
-        description: "Por favor, selecione uma nota de 1 a 5 estrelas.",
-        variant: "destructive"
-      });
+      alert("Avaliação necessária: Por favor, selecione uma nota de 1 a 5 estrelas.");
       return;
     }
     if (!feedbackMessage.trim()) {
-      toast({
-        title: "Mensagem necessária",
-        description: "Por favor, escreva uma breve mensagem.",
-        variant: "destructive"
-      });
+      alert("Mensagem necessária: Por favor, escreva uma breve mensagem.");
       return;
     }
 
@@ -2450,10 +2514,7 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
         message: feedbackMessage,
         updatedAt: new Date().toISOString()
       });
-      toast({
-        title: "Feedback enviado!",
-        description: "Obrigado por nos ajudar a melhorar o Orin.",
-      });
+      alert("Feedback enviado! Obrigado por nos ajudar a melhorar o Orin.");
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, feedbackPath);
     } finally {
@@ -2630,6 +2691,76 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
   }, [expenses, additionalSalaries, salary, reportRange]);
 
   return (
+    <>
+      {/* Update Prompt */}
+      {needRefresh && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="w-full max-w-md overflow-hidden bg-[#0A1A2F] border border-blue-500/20 rounded-3xl shadow-2xl relative"
+          >
+            {/* Header/Banner visual */}
+            <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-blue-500/20 to-transparent pointer-events-none" />
+            <div className="absolute top-[-50%] left-[-50%] right-[-50%] bottom-[-50%] bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5 mix-blend-overlay pointer-events-none" />
+
+            <div className="relative p-6 space-y-6">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-500 to-cyan-400 p-[1px] shadow-lg shadow-blue-500/30 shrink-0">
+                  <div className="w-full h-full bg-[#0A1A2F] rounded-[15px] flex items-center justify-center">
+                    <Download className="w-6 h-6 text-blue-400" />
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-xl font-extrabold text-white leading-tight">
+                    {appUpdateInfo?.title || 'Atualização Disponível'}
+                  </h3>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30 font-bold px-2 py-0.5">
+                      v{appUpdateInfo?.version || 'Nova'}
+                    </Badge>
+                    {appUpdateInfo?.isMandatory && (
+                      <Badge className="bg-red-500/20 text-red-400 border-red-500/30 font-bold px-2 py-0.5 text-[10px] uppercase">
+                        Obrigatória
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white/5 border border-white/5 rounded-2xl p-4 space-y-2">
+                <h4 className="font-bold text-white/90 text-sm">O que há de novo:</h4>
+                <div className="text-sm text-white/70 leading-relaxed whitespace-pre-wrap max-h-40 overflow-y-auto custom-scrollbar">
+                  {appUpdateInfo?.changelog || 'Melhorias de estabilidade e novas funcionalidades.'}
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                {(!appUpdateInfo || !appUpdateInfo.isMandatory) && (
+                  <Button 
+                    variant="ghost" 
+                    className="flex-1 rounded-2xl border border-white/10 hover:bg-white/5 h-12 text-white/70 font-bold"
+                    onClick={() => setNeedRefresh(false)}
+                  >
+                    Agora Não
+                  </Button>
+                )}
+                <Button 
+                  className={cn(
+                    "rounded-2xl h-12 font-bold flex items-center justify-center gap-2 transition-all shadow-lg",
+                    (!appUpdateInfo || !appUpdateInfo.isMandatory) ? "flex-1 bg-blue-500 hover:bg-blue-600 text-white shadow-blue-500/20" : "w-full bg-blue-500 hover:bg-blue-600 text-white shadow-blue-500/20"
+                  )}
+                  onClick={() => updateSWFn?.(true)}
+                >
+                  <RefreshCw className="w-5 h-5" />
+                  Baixar e Atualizar
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
     <div className={cn(
       "min-h-screen text-white p-4 md:p-8 font-sans overflow-x-hidden",
       theme === 'dark' ? "bg-gradient-to-br from-black to-zinc-950" : "bg-gradient-to-br from-[#010409] to-[#04142c]"
@@ -3021,10 +3152,18 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
                 transition={{ delay: 0.4 }}
                 className="liquid-glass rounded-3xl overflow-hidden"
               >
-                <button 
+                <div 
                   className="w-full p-6 border-b border-white/10 flex justify-between items-center cursor-pointer hover:bg-white/5 transition-colors text-left"
                   onClick={() => setIsFixedExpensesExpanded(!isFixedExpensesExpanded)}
                   aria-expanded={isFixedExpensesExpanded}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setIsFixedExpensesExpanded(!isFixedExpensesExpanded);
+                    }
+                  }}
                 >
                   <div className="flex items-center gap-3">
                     <h2 className="text-xl font-bold">Despesas Fixas</h2>
@@ -3055,7 +3194,7 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
                     <CheckCheck className="w-3.5 h-3.5" />
                     Pagar Todas
                   </Button>
-                </button>
+                </div>
                 <AnimatePresence initial={false}>
                   {isFixedExpensesExpanded && (
                     <motion.div
@@ -3122,10 +3261,18 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
               transition={{ delay: 0.45 }}
               className="liquid-glass rounded-3xl overflow-hidden"
             >
-              <button 
+              <div 
                 className="w-full p-6 border-b border-white/10 flex justify-between items-center cursor-pointer hover:bg-white/5 transition-colors text-left"
                 onClick={() => setIsVariableExpensesExpanded(!isVariableExpensesExpanded)}
                 aria-expanded={isVariableExpensesExpanded}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setIsVariableExpensesExpanded(!isVariableExpensesExpanded);
+                  }
+                }}
               >
                 <div className="flex items-center gap-3">
                   <h2 className="text-xl font-bold">Despesas</h2>
@@ -3156,7 +3303,7 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
                     Pagar Todas
                   </Button>
                 </div>
-              </button>
+              </div>
               
               <AnimatePresence initial={false}>
                 {isVariableExpensesExpanded && (
@@ -5426,11 +5573,11 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
                   </DialogTitle>
                 </DialogHeader>
                 
-                <div className="flex gap-2 mt-6 bg-white/5 p-1 rounded-2xl border border-white/5">
+                <div className="flex gap-2 mt-6 bg-white/5 p-1 rounded-2xl border border-white/5 overflow-x-auto custom-scrollbar">
                   <button
                     onClick={() => setAdminTab('users')}
                     className={cn(
-                      "flex-1 py-3 rounded-xl font-bold text-xs uppercase tracking-widest transition-all",
+                      "flex-1 min-w-[100px] py-3 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all",
                       adminTab === 'users' ? "bg-white text-[#04142c] shadow-lg" : "text-white/40 hover:text-white/60"
                     )}
                   >
@@ -5439,11 +5586,20 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
                   <button
                     onClick={() => setAdminTab('feedbacks')}
                     className={cn(
-                      "flex-1 py-3 rounded-xl font-bold text-xs uppercase tracking-widest transition-all",
+                      "flex-1 min-w-[100px] py-3 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all",
                       adminTab === 'feedbacks' ? "bg-white text-[#04142c] shadow-lg" : "text-white/40 hover:text-white/60"
                     )}
                   >
                     Feedbacks ({feedbacks.length})
+                  </button>
+                  <button
+                    onClick={() => setAdminTab('updates')}
+                    className={cn(
+                      "flex-1 min-w-[100px] py-3 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all",
+                      adminTab === 'updates' ? "bg-white text-[#04142c] shadow-lg" : "text-white/40 hover:text-white/60"
+                    )}
+                  >
+                    Atualização
                   </button>
                 </div>
               </div>
@@ -5497,7 +5653,7 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
                       ))}
                     </div>
                   )
-                ) : (
+                ) : adminTab === 'feedbacks' ? (
                   feedbacks.length === 0 ? (
                     <div className="text-center py-12 text-white/30 italic">Nenhum feedback recebido ainda.</div>
                   ) : (
@@ -5536,6 +5692,72 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
                       ))}
                     </div>
                   )
+                ) : (
+                  <div className="space-y-4">
+                    <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-2xl">
+                      <div className="flex items-center gap-2 text-blue-400 mb-2 font-bold">
+                        <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                        Atenção
+                      </div>
+                      <p className="text-sm text-white/70">
+                        Os dados aqui preenchidos serão exibidos no balão de atualização do sistema <strong>somente após um novo deploy no Vercel (versão real disponível)</strong>. Não force os usuários a atualizar para versões quebradas.
+                      </p>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div>
+                        <Label>Título Menor / Tagline</Label>
+                        <Input 
+                          placeholder="Ex: Nova Funcionalidade!" 
+                          className="bg-white/5 border-white/10 text-white h-12"
+                          value={updateForm.title}
+                          onChange={(e) => setUpdateForm({ ...updateForm, title: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <Label>Versão</Label>
+                        <Input 
+                          placeholder="Ex: 2.1.0" 
+                          className="bg-white/5 border-white/10 text-white h-12"
+                          value={updateForm.version}
+                          onChange={(e) => setUpdateForm({ ...updateForm, version: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <Label>Changelog (O que mudou)</Label>
+                        <Textarea 
+                          placeholder="Melhorias de estabilidade..." 
+                          className="bg-white/5 border-white/10 text-white min-h-[120px]"
+                          value={updateForm.changelog}
+                          onChange={(e) => setUpdateForm({ ...updateForm, changelog: e.target.value })}
+                        />
+                      </div>
+                      <div className="flex items-center gap-3 bg-white/5 p-4 border border-white/10 rounded-2xl hover:bg-white/10 transition-colors">
+                        <Checkbox 
+                          id="isMandatory" 
+                          className="border-white/30 data-[state=checked]:bg-red-500 data-[state=checked]:border-red-500" 
+                          checked={updateForm.isMandatory}
+                          onCheckedChange={(c) => setUpdateForm({ ...updateForm, isMandatory: !!c })}
+                        />
+                        <div className="grid gap-1.5 leading-none cursor-pointer flex-1" onClick={() => setUpdateForm(p => ({ ...p, isMandatory: !p.isMandatory }))}>
+                          <label htmlFor="isMandatory" className="text-sm font-bold leading-none cursor-pointer text-white">
+                            Atualização Obrigatória (Bloqueante)
+                          </label>
+                          <p className="text-[10px] text-white/50">
+                            Se marcado, os usuários não poderão fechar o balão sem clicar em "Atualizar".
+                          </p>
+                        </div>
+                      </div>
+
+                      <Button 
+                        className="w-full h-12 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-2xl shadow-lg mt-4" 
+                        onClick={handleSaveAppUpdate}
+                        disabled={isSavingUpdate}
+                      >
+                        {isSavingUpdate ? <RefreshCw className="w-5 h-5 animate-spin" /> : "Salvar Configuração e Preparar"}
+                      </Button>
+                    </div>
+                  </div>
                 )}
               </div>
               
@@ -5554,5 +5776,6 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
 
     </div>
   </div>
+  </>
   );
 }

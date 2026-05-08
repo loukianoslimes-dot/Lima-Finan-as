@@ -174,9 +174,22 @@ service cloud.firestore {
       }
     }
 
+    function isValidAppUpdate(data) {
+      return data.keys().hasAll(['title', 'version', 'changelog', 'isMandatory', 'updatedAt']) &&
+             isValidString(data.title, 1, 100) &&
+             isValidString(data.version, 1, 50) &&
+             isValidString(data.changelog, 0, 2000) &&
+             data.isMandatory is bool;
+    }
+
     match /system/config {
       allow read: if true;
-      allow write: if isAuthenticated() && request.auth.token.email == "loukianoslimes@gmail.com";
+      allow write: if isAdmin();
+    }
+
+    match /systemSettings/appUpdate {
+      allow read: if true;
+      allow write: if isAdmin() && isValidAppUpdate(request.resource.data);
     }
 
     match /feedbacks/{userId} {
