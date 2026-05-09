@@ -127,6 +127,7 @@
     font-weight: 600;
     font-style: italic;
     -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none;
     }
 }
 

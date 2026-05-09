@@ -3254,7 +3254,7 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
       )}
 
     <div className={cn(
-      "min-h-screen p-4 md:p-8 overflow-x-hidden relative transition-all duration-500",
+      "min-h-screen p-4 md:p-8 overflow-x-hidden relative transition-all duration-500 overscroll-y-none",
       theme === 'claro' ? "bg-[#edf4f3] text-[#0f172a] theme-claro" : 
       theme === 'escuro' ? "bg-black text-white theme-escuro" : "text-white theme-default"
     )}>
@@ -3640,7 +3640,7 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
               className="liquid-glass rounded-3xl overflow-hidden"
             >
               <div 
-                className="w-full p-4 sm:p-6 border-b border-white/10 flex flex-col sm:flex-row justify-between sm:items-center transition-colors gap-3"
+                className="w-full p-4 sm:p-6 border-b border-white/10 flex justify-between items-center transition-colors gap-3"
               >
                 <button
                   onClick={() => setIsFixedExpensesExpanded(!isFixedExpensesExpanded)}
@@ -3654,7 +3654,7 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
                     <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-white/50" />
                   </motion.div>
                 </button>
-                <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3">
+                <div className="flex items-center gap-2 sm:gap-3">
                   <div className="flex items-center gap-2">
                     <div className="text-xs sm:text-sm font-bold text-green-400 bg-green-400/10 px-2 sm:px-3 py-1 rounded-full">
                       {formatCurrency(fixedExpenses.reduce((sum, exp) => sum + exp.value, 0))}
@@ -4466,12 +4466,12 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
           >
             {/* User Card */}
             <div className="relative mb-14 mt-4">
-              <div className="bg-white rounded-[3rem] py-3 px-6 shadow-2xl flex flex-col justify-center min-h-[90px] border border-white/20">
-                <h2 className="text-xl font-black text-[#04142c] tracking-tight">{user?.displayName || 'Usuário'}</h2>
-                <p className="text-[#04142c]/40 text-[10px] font-medium tracking-wide truncate max-w-[180px]">{user?.email}</p>
+              <div className="liquid-glass rounded-[3rem] py-3 px-6 shadow-2xl flex flex-col justify-center min-h-[90px] border border-white/20">
+                <h2 className="text-xl font-black tracking-tight">{user?.displayName || 'Usuário'}</h2>
+                <p className="opacity-40 text-[10px] font-medium tracking-wide truncate max-w-[180px]">{user?.email}</p>
               </div>
               {/* Avatar overlay */}
-              <div className="absolute top-1/2 -translate-y-1/2 -right-2 w-24 h-24 rounded-full border-[6px] border-[#f0f4f8] bg-white shadow-2xl flex items-center justify-center overflow-hidden">
+              <div className="absolute top-1/2 -translate-y-1/2 -right-2 w-24 h-24 rounded-full border-[6px] border-[#04142c] bg-white shadow-2xl flex items-center justify-center overflow-hidden theme-claro:border-[#edf4f3]">
                 <div className="relative w-full h-full group">
                   {userPhotoUrl ? (
                     <img src={userPhotoUrl} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
@@ -6316,7 +6316,7 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
           </button>
 
           <Dialog open={isAdminPanelOpen} onOpenChange={setIsAdminPanelOpen}>
-            <DialogContent className={cn("liquid-glass border-white/10 text-white rounded-[2rem] w-[95vw] sm:max-w-xl max-h-[85vh] flex flex-col p-0 overflow-hidden", theme === 'escuro' ? "bg-zinc-950/95" : "bg-[#04142c]/95")}>
+            <DialogContent className={cn("fixed inset-0 w-full h-full max-w-none max-h-none rounded-none flex flex-col p-0 overflow-hidden liquid-glass border-none z-[100]", theme === 'escuro' ? "bg-zinc-950/95" : theme === 'claro' ? "bg-[#edf4f3]/95" : "bg-[#04142c]/95")}>
             <div className="p-4 sm:p-6 border-b border-white/10 bg-white/5">
               <DialogHeader>
                 <DialogTitle className="text-xl sm:text-2xl font-bold flex items-center gap-3">
