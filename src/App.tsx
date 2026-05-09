@@ -628,6 +628,24 @@ export default function App() {
   const [userFeedback, setUserFeedback] = useState<any | null>(null);
   const [adminTab, setAdminTab] = useState<'users' | 'feedbacks' | 'updates'>('users');
   const [adminSubTab, setAdminSubTab] = useState<'pending' | 'active' | 'rejected' | 'removed'>('pending');
+  const [updateHistory, setUpdateHistory] = useState<{id: string, date: string, status: string}[]>([]);
+  const [showUpdateSuccess, setShowUpdateSuccess] = useState(false);
+
+  const handleLaunchUpdate = async () => {
+    try {
+      await handleSaveAppUpdate();
+      const newUpdate = {
+        id: Math.random().toString(36).substr(2, 9),
+        date: new Date().toLocaleString('pt-BR'),
+        status: 'Lançado com Sucesso'
+      };
+      setUpdateHistory(prev => [newUpdate, ...prev]);
+      setShowUpdateSuccess(true);
+      setTimeout(() => setShowUpdateSuccess(false), 3000);
+    } catch (e) {
+      console.error(e);
+    }
+  };
   
   const [expandedMenu, setExpandedMenu] = useState<string | null>("VISUAL");
   const [copySuccess, setCopySuccess] = useState(false);
@@ -6316,8 +6334,8 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
           </button>
 
           <Dialog open={isAdminPanelOpen} onOpenChange={setIsAdminPanelOpen}>
-            <DialogContent className={cn("fixed inset-0 w-full h-full max-w-none max-h-none rounded-none flex flex-col p-0 overflow-hidden liquid-glass border-none z-[100]", theme === 'escuro' ? "bg-zinc-950/95" : theme === 'claro' ? "bg-[#edf4f3]/95" : "bg-[#04142c]/95")}>
-            <div className="p-4 sm:p-6 border-b border-white/10 bg-white/5">
+            <DialogContent className={cn("fixed inset-0 w-screen h-screen max-w-[100vw] max-h-[100vh] rounded-none flex flex-col p-0 overflow-hidden border-none z-[100] outline-none", theme === 'escuro' ? "bg-zinc-950" : theme === 'claro' ? "bg-[#edf4f3]" : "bg-[#04142c]")}>
+            <div className="p-4 sm:p-6 border-b border-white/10 bg-white/5 shrink-0">
               <DialogHeader>
                 <DialogTitle className="text-xl sm:text-2xl font-bold flex items-center gap-3">
                   <ShieldCheck className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400" />
@@ -6576,18 +6594,48 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
                     </div>
 
                     <Button 
-                      className="w-full h-12 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-2xl shadow-lg mt-2 text-sm" 
-                      onClick={handleSaveAppUpdate}
+                      className="w-full h-12 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-2xl shadow-lg mt-2 text-sm relative overflow-hidden" 
+                      onClick={handleLaunchUpdate}
                       disabled={isSavingUpdate}
                     >
-                      {isSavingUpdate ? <RefreshCw className="w-5 h-5 animate-spin" /> : "Salvar Configuração"}
+                      {isSavingUpdate ? <RefreshCw className="w-5 h-5 animate-spin" /> : "Lançar Atualização"}
+                      {showUpdateSuccess && (
+                        <motion.div 
+                          initial={{ opacity: 0 }} 
+                          animate={{ opacity: 1 }} 
+                          className="absolute inset-0 bg-emerald-500 text-white flex items-center justify-center font-black uppercase tracking-widest text-[10px]"
+                        >
+                          Lançamento Confirmado!
+                        </motion.div>
+                      )}
                     </Button>
+
+                    {/* Update History Section */}
+                    {updateHistory.length > 0 && (
+                      <div className="pt-4 space-y-3">
+                        <h4 className="text-[10px] font-black uppercase tracking-widest text-white/30 theme-claro:text-[#0f172a]/30">Histórico de Lançamentos</h4>
+                        <div className="space-y-2">
+                          {updateHistory.map(item => (
+                            <div key={item.id} className="flex justify-between items-center p-3 bg-white/5 rounded-xl border border-white/5 animate-in fade-in slide-in-from-top-2 duration-500">
+                              <div className="flex items-center gap-3">
+                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                                <span className="text-[11px] font-medium text-white/80 theme-claro:text-[#0f172a]/80">Deploy de Produção</span>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-[10px] font-bold text-white/40 theme-claro:text-[#0f172a]/40">{item.date}</div>
+                                <div className="text-[8px] font-black text-emerald-400 uppercase">{item.status}</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
             </div>
             
-            <div className="p-4 sm:p-6 border-t border-white/10 bg-white/5">
+            <div className="p-4 sm:p-6 border-t border-white/10 bg-white/5 shrink-0">
               <Button 
                 onClick={() => setIsAdminPanelOpen(false)}
                 className="w-full bg-white text-[#04142c] hover:bg-white/90 font-bold h-12 sm:h-14 rounded-2xl text-base sm:text-lg"
