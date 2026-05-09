@@ -3286,7 +3286,7 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
       )}
 
     <div className={cn(
-      "min-h-screen p-4 md:p-8 overflow-x-hidden relative transition-all duration-500 overscroll-y-none",
+      "min-h-screen p-4 md:p-8 overflow-x-hidden relative transition-all duration-500",
       theme === 'claro' ? "bg-[#edf4f3] text-[#0f172a] theme-claro" : 
       theme === 'escuro' ? "bg-black text-white theme-escuro" : "text-white theme-default"
     )}>
@@ -6379,7 +6379,7 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
           </button>
 
           <Dialog open={isAdminPanelOpen} onOpenChange={setIsAdminPanelOpen}>
-            <DialogContent className={cn("fixed inset-0 w-screen h-screen max-w-[100vw] max-h-[100vh] rounded-none flex flex-col p-0 overflow-hidden border-none z-[100] outline-none", theme === 'escuro' ? "bg-zinc-950" : theme === 'claro' ? "bg-[#edf4f3]" : "bg-[#04142c]")}>
+            <DialogContent className={cn("fixed inset-0 w-full h-full max-w-none max-h-none rounded-none flex flex-col p-0 overflow-hidden border-none z-[100] outline-none", theme === 'escuro' ? "bg-zinc-950" : theme === 'claro' ? "bg-[#edf4f3]" : "bg-[#04142c]")}>
             <div className="p-4 sm:p-6 border-b border-white/10 bg-white/5 shrink-0">
               <DialogHeader>
                 <DialogTitle className="text-xl sm:text-2xl font-bold flex items-center gap-3">
