@@ -3099,17 +3099,17 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
   return (
     <>
       <style>{`
-        /* Tema Claro */
+        /* Tema Claro: Orin Light (Celestial Mint) */
         .theme-claro h1, .theme-claro h2, .theme-claro h3, .theme-claro h4, 
         .theme-claro .text-white, .theme-claro .text-white/90,
         .theme-claro .font-black:not([class*="text-green"]):not([class*="text-red"]):not([class*="text-rose"]):not([class*="text-emerald"]) {
-          color: #115463 !important;
+          color: #124275 !important;
         }
         
         .theme-claro p, 
         .theme-claro span:not([class*="text-green"]):not([class*="text-red"]):not([class*="text-rose"]):not([class*="text-emerald"]),
         .theme-claro .text-white/70, .theme-claro .text-white/60, .theme-claro .text-white/40, .theme-claro .text-white/20 {
-          color: #154d79 !important;
+          color: #475569 !important;
         }
 
         .theme-claro .liquid-glass, 
@@ -3117,25 +3117,45 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
         .theme-claro .bg-white/5,
         .theme-claro .bg-white/40,
         .theme-claro .bg-[#0A1A2F],
+        .theme-claro .bg-gradient-to-br,
         .theme-claro div[class*="bg-white/5"],
         .theme-claro div[class*="bg-white/10"] {
-          background-color: #edfffc !important;
-          border-color: rgba(17, 84, 99, 0.1) !important;
-          box-shadow: 0 8px 32px 0 rgba(17, 84, 99, 0.05) !important;
+          background-color: rgba(255, 255, 255, 0.8) !important;
+          backdrop-filter: blur(8px) saturate(130%) !important;
+          -webkit-backdrop-filter: blur(8px) saturate(130%) !important;
+          border-color: rgba(0, 0, 0, 0.05) !important;
+          box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06) !important;
         }
 
         .theme-claro .border-white/5, .theme-claro .border-white/10, .theme-claro .border-white/20 {
-          border-color: rgba(17, 84, 99, 0.1) !important;
+          border-color: rgba(0, 0, 0, 0.05) !important;
+        }
+
+        .theme-claro button.bg-blue-500, .theme-claro .bg-blue-500 {
+          background-color: #124275 !important;
+          color: white !important;
+        }
+
+        .theme-claro .text-blue-400, .theme-claro .text-blue-300 {
+          color: #124275 !important;
         }
 
         .theme-claro input, .theme-claro textarea {
           background-color: white !important;
-          color: #115463 !important;
-          border-color: rgba(17, 84, 99, 0.2) !important;
+          color: #0f172a !important;
+          border-color: rgba(0, 0, 0, 0.1) !important;
         }
 
         .theme-claro .divide-white/5 > * {
-          border-color: rgba(17, 84, 99, 0.1) !important;
+          border-color: rgba(0, 0, 0, 0.05) !important;
+        }
+
+        /* Status Overrides */
+        .theme-claro .text-green-400, .theme-claro .text-green-500, .theme-claro .text-emerald-400 {
+          color: #16a34a !important;
+        }
+        .theme-claro .text-red-400, .theme-claro .text-red-500, .theme-claro .text-rose-500, .theme-claro .text-rose-400 {
+          color: #dc2626 !important;
         }
 
         /* Tema Escuro */
@@ -3242,7 +3262,7 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
           </>
         )}
         {theme === 'claro' && (
-          <div className="absolute inset-0 bg-gradient-to-br from-white to-[#edfffc]" />
+          <div className="absolute inset-0 bg-gradient-to-br from-[#edf4f3] to-[#e0ebea]" />
         )}
         {theme === 'escuro' && (
           <div className="absolute inset-0 bg-gradient-to-b from-black to-gray-800" />
