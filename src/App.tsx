@@ -3130,13 +3130,13 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
         .theme-claro h1, .theme-claro h2, .theme-claro h3, .theme-claro h4, 
         .theme-claro .text-white, .theme-claro .text-white/90,
         .theme-claro .font-black:not([class*="text-green"]):not([class*="text-red"]):not([class*="text-rose"]):not([class*="text-emerald"]) {
-          color: #124275 !important;
+          color: #144477 !important;
         }
         
         .theme-claro p, 
         .theme-claro span:not([class*="text-green"]):not([class*="text-red"]):not([class*="text-rose"]):not([class*="text-emerald"]),
         .theme-claro .text-white/70, .theme-claro .text-white/60, .theme-claro .text-white/40, .theme-claro .text-white/20 {
-          color: #0f172a !important;
+          color: #115463 !important;
         }
 
         .theme-claro .liquid-glass, 
@@ -3147,15 +3147,29 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
         .theme-claro .bg-gradient-to-br,
         .theme-claro div[class*="bg-white/5"],
         .theme-claro div[class*="bg-white/10"] {
-          background-color: rgba(255, 255, 255, 0.8) !important;
-          backdrop-filter: blur(8px) !important;
-          -webkit-backdrop-filter: blur(8px) !important;
-          border-color: rgba(18, 66, 117, 0.08) !important;
-          box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04) !important;
+          background-color: #ffffff !important;
+          backdrop-filter: none !important;
+          -webkit-backdrop-filter: none !important;
+          border: 1px solid rgba(20, 68, 119, 0.1) !important;
+          box-shadow: 0 4px 20px rgba(20, 68, 119, 0.05) !important;
         }
 
         .theme-claro .border-white/5, .theme-claro .border-white/10, .theme-claro .border-white/20 {
-          border-color: rgba(0, 0, 0, 0.05) !important;
+          border-color: rgba(20, 68, 119, 0.1) !important;
+        }
+
+        .theme-claro .bottom-nav-container {
+          background-color: #cee4e0 !important;
+          border: 1px solid rgba(20, 68, 119, 0.1) !important;
+        }
+
+        .theme-claro .month-selector-container {
+          background-color: #ffffff !important;
+          border: 1px solid rgba(20, 68, 119, 0.1) !important;
+        }
+
+        .theme-claro .month-arrow {
+          color: #cee4e0 !important;
         }
 
         .theme-claro button.bg-blue-500, .theme-claro .bg-blue-500 {
@@ -3405,7 +3419,10 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
                   <RefreshCw className="w-8 h-8 text-[#04142c] rotate-[-45deg]" />
                 </div>
                 <div>
-                  <h1 className="text-2xl font-black italic tracking-tighter text-white leading-none">ORIN</h1>
+                  <h1 className={cn(
+                    "text-2xl font-black italic tracking-tighter leading-none",
+                    theme === 'claro' ? "text-[#115463]" : "text-white"
+                  )}>ORIN</h1>
                   <p className="text-[8px] font-bold tracking-[0.3em] text-blue-400 mt-1 uppercase leading-none">A Organização Inteligente</p>
                 </div>
               </div>
@@ -4691,32 +4708,41 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
 
         {/* Top Month Selector */}
         {user && (activeTab === "home" || activeTab === "debtors") && (
-          <div className="fixed top-0 left-0 right-0 p-4 flex justify-center z-40">
+          <div className="fixed top-0 left-0 right-0 p-4 flex justify-center z-[50]">
             <motion.div 
               initial={{ y: -20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
-              className="bg-white/10 backdrop-blur-2xl border border-white/20 rounded-full p-2 flex items-center justify-between gap-2 shadow-2xl min-w-[200px] sm:min-w-[260px]"
+              className={cn(
+                "rounded-full p-2 flex items-center justify-between gap-2 shadow-2xl min-w-[200px] sm:min-w-[260px]",
+                theme === 'claro' ? "month-selector-container" : "bg-white/10 backdrop-blur-2xl border border-white/20"
+              )}
             >
               <Button 
                 variant="ghost" 
                 size="icon" 
                 onClick={() => changeMonth(-1)} 
-                className="text-white hover:bg-white/10 h-12 w-12 rounded-full transition-all active:scale-95"
+                className={cn(
+                  "h-12 w-12 rounded-full transition-all active:scale-95",
+                  theme === 'claro' ? "month-arrow" : "text-white hover:bg-white/10"
+                )}
                 title="Mês Anterior"
               >
                 <ChevronLeft className="w-5 h-5" />
               </Button>
               
               <div className="text-center min-w-[80px] sm:min-w-[120px]">
-                <div className="text-[10px] uppercase font-bold text-white/50 tracking-widest leading-none mb-0.5">{year}</div>
-                <div className="text-lg font-bold capitalize leading-none">{monthName}</div>
+                <div className={cn("text-[10px] uppercase font-bold tracking-widest leading-none mb-0.5", theme === 'claro' ? "text-[#115463]/50" : "text-white/50")}>{year}</div>
+                <div className={cn("text-lg font-bold capitalize leading-none", theme === 'claro' ? "text-[#144477]" : "text-white")}>{monthName}</div>
               </div>
               
               <Button 
                 variant="ghost" 
                 size="icon" 
                 onClick={() => changeMonth(1)} 
-                className="text-white hover:bg-white/10 h-12 w-12 rounded-full transition-all active:scale-95"
+                className={cn(
+                  "h-12 w-12 rounded-full transition-all active:scale-95",
+                  theme === 'claro' ? "month-arrow" : "text-white hover:bg-white/10"
+                )}
                 title="Próximo Mês"
               >
                 <ChevronRight className="w-5 h-5" />
@@ -4796,13 +4822,20 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
               )}
             </AnimatePresence>
 
-            <div className="fixed bottom-0 left-0 right-0 p-4 flex justify-center z-40 pointer-events-none">
-              <div className="bg-white/10 backdrop-blur-2xl border border-white/20 rounded-full p-1.5 sm:p-2 flex items-center gap-1 shadow-2xl pointer-events-auto">
+            <div className="fixed bottom-0 left-0 right-0 p-4 flex justify-center z-[50] pointer-events-none mb-2">
+              <div className={cn(
+                "rounded-full p-1.5 sm:p-2 flex items-center gap-1 shadow-2xl pointer-events-auto",
+                theme === 'claro' ? "bottom-nav-container" : "bg-white/10 backdrop-blur-2xl border border-white/20"
+              )}>
                 <Button 
                   variant="ghost" 
                   size="icon" 
                   onClick={() => setActiveTab("home")}
-                  className={cn("w-10 h-10 sm:w-12 sm:h-12 rounded-full transition-all", activeTab === "home" ? "bg-white text-[#04142c]" : "text-white/60")}
+                  className={cn("w-12 h-12 rounded-full transition-all", 
+                    activeTab === "home" 
+                      ? theme === 'claro' ? "bg-white text-[#144477] shadow-sm" : "bg-white text-[#04142c]" 
+                      : theme === 'claro' ? "text-[#144477]/60" : "text-white/60"
+                  )}
                   title="Início"
                 >
                   <Home className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -4812,7 +4845,11 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
                   variant="ghost" 
                   size="icon" 
                   onClick={() => setActiveTab("debtors")}
-                  className={cn("w-10 h-10 sm:w-12 sm:h-12 rounded-full transition-all", activeTab === "debtors" ? "bg-white text-[#04142c]" : "text-white/60")}
+                  className={cn("w-12 h-12 rounded-full transition-all", 
+                    activeTab === "debtors" 
+                      ? theme === 'claro' ? "bg-white text-[#144477] shadow-sm" : "bg-white text-[#04142c]" 
+                      : theme === 'claro' ? "text-[#144477]/60" : "text-white/60"
+                  )}
                   title="Devedores"
                 >
                   <UserIcon className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -4822,10 +4859,10 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
                   <Button 
                     onClick={() => setIsSpeedDialOpen(!isSpeedDialOpen)}
                     className={cn(
-                      "w-10 h-10 sm:w-12 sm:h-12 rounded-full transition-all z-[80] relative",
+                      "w-12 h-12 rounded-full transition-all z-[80] relative",
                       isSpeedDialOpen 
-                        ? "bg-rose-500 text-white rotate-45" 
-                        : "bg-green-500 text-white shadow-lg hover:bg-green-600"
+                        ? "bg-rose-500 text-white rotate-45 shadow-xl" 
+                        : "bg-green-500 text-white shadow-lg hover:bg-green-600 animate-pulse"
                     )}
                     title="Menu de adição"
                   >
@@ -4837,7 +4874,11 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
                   variant="ghost" 
                   size="icon" 
                   onClick={() => setActiveTab("report")}
-                  className={cn("w-10 h-10 sm:w-12 sm:h-12 rounded-full transition-all", activeTab === "report" ? "bg-white text-[#04142c]" : "text-white/60")}
+                  className={cn("w-12 h-12 rounded-full transition-all", 
+                    activeTab === "report" 
+                      ? theme === 'claro' ? "bg-white text-[#144477] shadow-sm" : "bg-white text-[#04142c]" 
+                      : theme === 'claro' ? "text-[#144477]/60" : "text-white/60"
+                  )}
                   title="Relatório"
                 >
                   <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -4847,7 +4888,11 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
                   variant="ghost" 
                   size="icon" 
                   onClick={() => setActiveTab("settings")}
-                  className={cn("w-10 h-10 sm:w-12 sm:h-12 rounded-full transition-all", activeTab === "settings" ? "bg-white text-[#04142c]" : "text-white/60")}
+                  className={cn("w-12 h-12 rounded-full transition-all", 
+                    activeTab === "settings" 
+                      ? theme === 'claro' ? "bg-white text-[#144477] shadow-sm" : "bg-white text-[#04142c]" 
+                      : theme === 'claro' ? "text-[#144477]/60" : "text-white/60"
+                  )}
                   title="Configuração"
                 >
                   <Settings className="w-5 h-5 sm:w-6 sm:h-6" />
