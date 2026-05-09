@@ -495,6 +495,13 @@ export default function App() {
       },
     });
     setUpdateSWFn(() => updateSW);
+
+    // Periodic check for updates (every 5 minutes)
+    const interval = setInterval(() => {
+      updateSW(true);
+    }, 5 * 60 * 1000);
+
+    return () => clearInterval(interval);
   }, []);
   // -------------------------
 
@@ -510,6 +517,7 @@ export default function App() {
   }, []);
 
   const [isAuthReady, setIsAuthReady] = useState(false);
+  const [isStatusLoaded, setIsStatusLoaded] = useState(false);
   const [isSyncing, setIsSyncing] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -1049,6 +1057,7 @@ export default function App() {
     // App User Status Sync
     const userStatusPath = `app_users/${user.uid}`;
     const userStatusUnsubscribe = onSnapshot(doc(db, userStatusPath), async (docSnap) => {
+      setIsStatusLoaded(true);
       if (docSnap.exists()) {
         setAppUserStatus(docSnap.data().status as AppUser['status']);
       } else {
@@ -3109,7 +3118,7 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
         .theme-claro p, 
         .theme-claro span:not([class*="text-green"]):not([class*="text-red"]):not([class*="text-rose"]):not([class*="text-emerald"]),
         .theme-claro .text-white/70, .theme-claro .text-white/60, .theme-claro .text-white/40, .theme-claro .text-white/20 {
-          color: #475569 !important;
+          color: #0f172a !important;
         }
 
         .theme-claro .liquid-glass, 
@@ -3121,10 +3130,10 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
         .theme-claro div[class*="bg-white/5"],
         .theme-claro div[class*="bg-white/10"] {
           background-color: rgba(255, 255, 255, 0.8) !important;
-          backdrop-filter: blur(8px) saturate(130%) !important;
-          -webkit-backdrop-filter: blur(8px) saturate(130%) !important;
-          border-color: rgba(0, 0, 0, 0.05) !important;
-          box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06) !important;
+          backdrop-filter: blur(8px) !important;
+          -webkit-backdrop-filter: blur(8px) !important;
+          border-color: rgba(18, 66, 117, 0.08) !important;
+          box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04) !important;
         }
 
         .theme-claro .border-white/5, .theme-claro .border-white/10, .theme-claro .border-white/20 {
@@ -3245,8 +3254,8 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
       )}
 
     <div className={cn(
-      "min-h-screen p-4 md:p-8 overflow-x-hidden relative transition-colors duration-500",
-      theme === 'claro' ? "bg-white text-[#115463] theme-claro" : 
+      "min-h-screen p-4 md:p-8 overflow-x-hidden relative transition-all duration-500",
+      theme === 'claro' ? "bg-[#edf4f3] text-[#0f172a] theme-claro" : 
       theme === 'escuro' ? "bg-black text-white theme-escuro" : "text-white theme-default"
     )}>
       {/* Dynamic Glassmorphism Background */}
@@ -3274,7 +3283,7 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
         style={{ zoom: zoomLevel } as React.CSSProperties}
       >
         {/* Auth Loading State */}
-        {!isAuthReady ? (
+        {!isAuthReady || (user && !isStatusLoaded) ? (
           <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
             <div className="w-12 h-12 border-4 border-white/20 border-t-white rounded-full animate-spin" />
             <p className="text-white/60 font-medium">Carregando...</p>
@@ -3624,37 +3633,37 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
 
 
             {/* Fixed Expenses Card */}
-            {fixedExpenses.length > 0 && (
-              <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-                className="liquid-glass rounded-3xl overflow-hidden"
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+              className="liquid-glass rounded-3xl overflow-hidden"
+            >
+              <div 
+                className="w-full p-4 sm:p-6 border-b border-white/10 flex flex-col sm:flex-row justify-between sm:items-center transition-colors gap-3"
               >
-                <div 
-                  className="w-full p-4 sm:p-6 border-b border-white/10 flex flex-col sm:flex-row justify-between sm:items-center transition-colors gap-3"
+                <button
+                  onClick={() => setIsFixedExpensesExpanded(!isFixedExpensesExpanded)}
+                  className="flex-1 flex items-center gap-2 sm:gap-3 text-left hover:opacity-80 transition-opacity"
                 >
-                  <button
-                    onClick={() => setIsFixedExpensesExpanded(!isFixedExpensesExpanded)}
-                    className="flex-1 flex items-center gap-2 sm:gap-3 text-left hover:opacity-80 transition-opacity"
+                  <h2 className="text-lg sm:text-xl font-bold">Despesas Fixas</h2>
+                  <motion.div
+                    animate={{ rotate: isFixedExpensesExpanded ? 180 : 0 }}
+                    transition={{ duration: 0.3 }}
                   >
-                    <h2 className="text-lg sm:text-xl font-bold">Despesas Fixas</h2>
-                    <motion.div
-                      animate={{ rotate: isFixedExpensesExpanded ? 180 : 0 }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-white/50" />
-                    </motion.div>
-                  </button>
-                  <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3">
-                    <div className="flex items-center gap-2">
-                      <div className="text-xs sm:text-sm font-bold text-green-400 bg-green-400/10 px-2 sm:px-3 py-1 rounded-full">
-                        {formatCurrency(fixedExpenses.reduce((sum, exp) => sum + exp.value, 0))}
-                      </div>
-                      <Badge variant="outline" className="text-white border-white/30 text-[9px] sm:text-xs">
-                        {fixedExpenses.length} itens
-                      </Badge>
+                    <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-white/50" />
+                  </motion.div>
+                </button>
+                <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3">
+                  <div className="flex items-center gap-2">
+                    <div className="text-xs sm:text-sm font-bold text-green-400 bg-green-400/10 px-2 sm:px-3 py-1 rounded-full">
+                      {formatCurrency(fixedExpenses.reduce((sum, exp) => sum + exp.value, 0))}
                     </div>
+                    <Badge variant="outline" className="text-white border-white/30 text-[9px] sm:text-xs">
+                      {fixedExpenses.length} itens
+                    </Badge>
+                  </div>
+                  {fixedExpenses.length > 0 && (
                     <Button
                       variant="ghost" 
                       size="sm"
@@ -3672,66 +3681,70 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
                       {lastBatchFixedIds.length > 0 ? <RefreshCw className="w-3 sm:h-3.5 sm:w-3.5 h-3" /> : <CheckCheck className="w-3 sm:h-3.5 sm:w-3.5 h-3" />}
                       {lastBatchFixedIds.length > 0 ? "Desfazer Tudo" : "Pagar Todas"}
                     </Button>
-                  </div>
-                </div>
-                <AnimatePresence initial={false}>
-                  {isFixedExpensesExpanded && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.3, ease: "easeInOut" }}
-                      className="overflow-hidden"
-                    >
-                      <div className="p-6 space-y-6">
-                        {(() => {
-                          const grouped: { [key: string]: Expense[] } = {};
-                          fixedExpenses.forEach(e => {
-                            const dateKey = e.date.split('T')[0];
-                            if (!grouped[dateKey]) grouped[dateKey] = [];
-                            grouped[dateKey].push(e);
-                          });
-
-                          return Object.keys(grouped).sort().map(dateStr => {
-                            const date = new Date(dateStr + "T12:00:00");
-                            const dayOfWeek = date.toLocaleString('pt-BR', { weekday: 'long' });
-                            const formattedDate = formatDate(dateStr);
-                            const dailyTotal = grouped[dateStr].reduce((sum, exp) => sum + exp.value, 0);
-
-                            return (
-                              <div key={dateStr} className="space-y-3">
-                                <div className="flex items-center gap-3">
-                                  <div className="h-px flex-1 bg-white/10" />
-                                  <div className="text-[10px] uppercase font-bold text-white/40 tracking-widest flex items-center gap-2">
-                                    <CalendarIcon className="w-3 h-3" />
-                                    {formattedDate} • <span className="text-blue-300 capitalize">{dayOfWeek}</span> • <span className="text-green-400 font-bold">{formatCurrency(dailyTotal)}</span>
-                                  </div>
-                                  <div className="h-px flex-1 bg-white/10" />
-                                </div>
-                                <div className="space-y-3">
-                                  {grouped[dateStr].map(expense => (
-                                    <ExpenseItem
-                                      key={`${expense.id}-${currentDate.toISOString().slice(0, 7)}`}
-                                      expense={expense}
-                                      currentMonthStr={currentDate.toISOString().slice(0, 7)}
-                                      onTogglePaid={handleTogglePaid}
-                                      onEdit={handleEditExpense}
-                                      onDelete={handleDeleteExpense}
-                                      formatCurrency={formatCurrency}
-                                      formatDate={formatDate}
-                                    />
-                                  ))}
-                                </div>
-                              </div>
-                            );
-                          });
-                        })()}
-                      </div>
-                    </motion.div>
                   )}
-                </AnimatePresence>
-              </motion.div>
-            )}
+                </div>
+              </div>
+              <AnimatePresence initial={false}>
+                {isFixedExpensesExpanded && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.3, ease: "easeInOut" }}
+                    className="overflow-hidden"
+                  >
+                    <div className="p-6 space-y-6">
+                      {fixedExpenses.length === 0 ? (
+                        <div className="text-center py-12 text-white/50">
+                          Nenhuma despesa fixa para este mês.
+                        </div>
+                      ) : (() => {
+                        const grouped: { [key: string]: Expense[] } = {};
+                        fixedExpenses.forEach(e => {
+                          const dateKey = e.date.split('T')[0];
+                          if (!grouped[dateKey]) grouped[dateKey] = [];
+                          grouped[dateKey].push(e);
+                        });
+
+                        return Object.keys(grouped).sort().map(dateStr => {
+                          const date = new Date(dateStr + "T12:00:00");
+                          const dayOfWeek = date.toLocaleString('pt-BR', { weekday: 'long' });
+                          const formattedDate = formatDate(dateStr);
+                          const dailyTotal = grouped[dateStr].reduce((sum, exp) => sum + exp.value, 0);
+
+                          return (
+                            <div key={dateStr} className="space-y-3">
+                              <div className="items-center gap-3 flex">
+                                <div className="h-px flex-1 bg-white/10" />
+                                <div className="text-[10px] uppercase font-bold text-white/40 tracking-widest flex items-center gap-2">
+                                  <CalendarIcon className="w-3 h-3" />
+                                  {formattedDate} • <span className="text-blue-300 capitalize">{dayOfWeek}</span> • <span className="text-green-400 font-bold">{formatCurrency(dailyTotal)}</span>
+                                </div>
+                                <div className="h-px flex-1 bg-white/10" />
+                              </div>
+                              <div className="space-y-3">
+                                {grouped[dateStr].map(expense => (
+                                  <ExpenseItem
+                                    key={`${expense.id}-${currentDate.toISOString().slice(0, 7)}`}
+                                    expense={expense}
+                                    currentMonthStr={currentDate.toISOString().slice(0, 7)}
+                                    onTogglePaid={handleTogglePaid}
+                                    onEdit={handleEditExpense}
+                                    onDelete={handleDeleteExpense}
+                                    formatCurrency={formatCurrency}
+                                    formatDate={formatDate}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        });
+                      })()}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
 
             {/* Variable Expenses List */}
             <motion.div 
@@ -6586,6 +6599,38 @@ ${formattedValue} ${debtor.notes ? `(${debtor.notes})` : `(${debtor.description}
           </Dialog>
         </>
       )}
+
+      {/* PWA Update Notification */}
+      <AnimatePresence>
+        {needRefresh && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.9 }}
+            className="fixed bottom-4 right-4 z-[9999] cursor-pointer group"
+            onClick={() => updateSWFn && updateSWFn(true)}
+          >
+            <div className="bg-white text-[#0f172a] p-4 pr-6 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] flex items-center gap-3 border border-emerald-500/20 relative">
+              {/* Pulsing indicator */}
+              <div className="absolute -top-1 -right-1 flex h-4 w-4">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-500 items-center justify-center text-[10px] text-white font-bold">
+                  1
+                </span>
+              </div>
+
+              <div className="bg-emerald-500/10 p-2.5 rounded-xl group-hover:bg-emerald-500/20 transition-colors">
+                <RefreshCw className="w-5 h-5 text-emerald-600 animate-spin" style={{ animationDuration: '3s' }} />
+              </div>
+              
+              <div className="flex flex-col">
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600 leading-none mb-1">Nova versão!</span>
+                <span className="text-sm font-bold text-[#0f172a]">Toque para atualizar</span>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </div>
   </div>
